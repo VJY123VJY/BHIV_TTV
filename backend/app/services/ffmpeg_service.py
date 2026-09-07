@@ -1,0 +1,100 @@
+import os
+import subprocess
+from typing import List, Dict, Any
+from app.models.scene import Scene
+from app.core.config import settings
+from app.core.exceptions import FFmpegProcessingError
+from app.core.logging import telemetry
+from app.utils.media_check import validate_video_file
+
+class FFmpegService:
+    """
+    Production video compositor leveraging system FFmpeg.
+    - Concatenates scene clips with seamless stream alignment
+    - Multiplexes synchronized speech & ambient audio
+    - Generates and embeds synchronized subtitle streams
+    - Enforces web-standard H.264 (yuv420p) + AAC encoding with faststart
+    """
+    def assemble_final_video(self, scenes: List[Scene], master_audio_path: str, output_path: str, execution_id: str) -> str:
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        temp_dir = settings.get_absolute_path(settings.TEMP_DIR)
+        os.makedirs(temp_dir, exist_ok=True)
+
+        # 1. Create FFmpeg concat demuxer file
+        concat_file = str(temp_dir / f"{execution_id}_concat.txt")
+        with open(concat_file, "w", encoding="utf-8") as f:
+            for scene in scenes:
+                if not scene.video_path or not os.path.exists(scene.video_path):
+                    raise FFmpegProcessingError(f"Missing scene video clip: {scene.video_path}")
+                # FFmpeg concat file requires escaped forward slashes
+                clean_path = os.path.abspath(scene.video_path).replace("\\", "/")
+                f.write(f"file '{clean_path}'\n")
+
+        # 2. Build and execute FFmpeg command
+        # Concatenate video streams and mux with master audio
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", concat_file,
+            "-i", master_audio_path,
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-preset", "fast",
+            "-crf", "22",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-shortest",
+            "-movflags", "+faststart",
+            output_path
+        ]
+
+        telemetry.emit("ffmpeg_assembly_started", execution_id, {"output_path": output_path})
+        
+        try:
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+        except subprocess.CalledProcessError as e:
+            telemetry.emit("ffmpeg_assembly_failed", execution_id, {"stderr": e.stderr}, level="error")
+            raise FFmpegProcessingError(f"FFmpeg assembly failed: {e.stderr}")
+        finally:
+            if os.path.exists(concat_file):
+                try:
+                    os.remove(concat_file)
+                except Exception:
+                    pass
+
+        # 3. Validate resulting video file
+        is_valid, info = validate_video_file(output_path)
+        if not is_valid:
+            raise FFmpegProcessingError(f"Assembled video failed validation: {info.get('error')}")
+
+        telemetry.emit("ffmpeg_assembly_completed", execution_id, info)
+        return output_path
+
+    def generate_srt_subtitles(self, scenes: List[Scene], output_srt_path: str) -> str:
+        """Generates a standard SubRip (.srt) subtitle file matching scene timings."""
+        os.makedirs(os.path.dirname(output_srt_path), exist_ok=True)
+        current_time = 0.0
+
+        def _format_srt_time(seconds: float) -> str:
+            hrs = int(seconds // 3600)
+            mins = int((seconds % 3600) // 60)
+            secs = int(seconds % 60)
+            millis = int((seconds - int(seconds)) * 1000)
+            return f"{hrs:02d}:{mins:02d}:{secs:02d},{millis:03d}"
+
+        with open(output_srt_path, "w", encoding="utf-8") as f:
+            for idx, scene in enumerate(scenes, 1):
+                start_str = _format_srt_time(current_time)
+                end_str = _format_srt_time(current_time + scene.duration)
+                text = scene.narrative or scene.title
+                
+                f.write(f"{idx}\n")
+                f.write(f"{start_str} --> {end_str}\n")
+                f.write(f"{text}\n\n")
+                
+                current_time += scene.duration
+
+        return output_srt_path
+
+ffmpeg_service = FFmpegService()

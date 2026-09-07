@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified Text-to-Video AI Studio</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <span class="icon">🎬</span>
+                <h1>Unified Text-to-Video Studio</h1>
+            </div>
+            <div class="header-badges">
+                <span class="badge" id="engine-status">Engine: Ready</span>
+                <span class="badge badge-accent">Production v1.0</span>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <main class="main-content">
+            <!-- Controls Panel -->
+            <section class="panel control-panel">
+                <h2>Create Your Video</h2>
+                <p class="subtitle">Transform text prompts into complete cinematic videos with synchronized narration and audio.</p>
+
+                <form id="generate-form">
+                    <div class="form-group">
+                        <label for="prompt-input">Prompt</label>
+                        <textarea id="prompt-input" rows="4" placeholder="Describe the scene or story (e.g., A small robot explores a futuristic city at sunset)..." required>A small robot explores a futuristic city at sunset.</textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="duration-slider">Duration: <span id="duration-val">15</span>s</label>
+                            <input type="range" id="duration-slider" min="5" max="60" value="15" step="5">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="style-select">Visual Style</label>
+                            <select id="style-select">
+                                <option value="cinematic" selected>Cinematic 35mm</option>
+                                <option value="anime">Anime / Aesthetic</option>
+                                <option value="cyberpunk">Cyberpunk Metropolis</option>
+                                <option value="realistic">National Geographic Realistic</option>
+                                <option value="fantasy">Epic Fantasy</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group checkbox-group">
+                            <label class="toggle-label">
+                                <input type="checkbox" id="voice-toggle" checked>
+                                <span class="toggle-slider"></span>
+                                <span class="toggle-text">Enable Voice Narration (TTS)</span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label for="resolution-select">Resolution</label>
+                            <select id="resolution-select">
+                                <option value="1280x720" selected>720p HD (1280x720)</option>
+                                <option value="1920x1080">1080p FHD (1920x1080)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="generate-btn" class="btn btn-primary">
+                        <span class="btn-text">Generate Video</span>
+                        <span class="btn-icon">⚡</span>
+                    </button>
+                </form>
+            </section>
+
+            <!-- Preview & Status Panel -->
+            <section class="panel preview-panel">
+                <h2>Studio Output & Preview</h2>
+
+                <!-- Status & Progress Container -->
+                <div id="progress-container" class="progress-card hidden">
+                    <div class="progress-header">
+                        <span id="stage-text" class="stage-text">Initializing pipeline...</span>
+                        <span id="percent-text" class="percent-text">0%</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%"></div>
+                    </div>
+                    <div class="pipeline-tracker">
+                        <div class="track-step" id="step-story">1. Story</div>
+                        <div class="track-step" id="step-scenes">2. Scenes</div>
+                        <div class="track-step" id="step-visuals">3. Visuals</div>
+                        <div class="track-step" id="step-audio">4. Audio</div>
+                        <div class="track-step" id="step-final">5. MP4 Assembly</div>
+                    </div>
+                </div>
+
+                <!-- Video Display Area -->
+                <div class="video-display-area" id="video-display-area">
+                    <div class="placeholder-content" id="placeholder-content">
+                        <div class="placeholder-icon">📽️</div>
+                        <p>Your generated video will appear here.</p>
+                    </div>
+
+                    <div class="player-wrapper hidden" id="player-wrapper">
+                        <video id="video-player" controls preload="metadata"></video>
+                        <div class="video-actions">
+                            <a id="download-btn" class="btn btn-secondary" href="#" download="generated_video.mp4">
+                                ⬇ Download Final MP4
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scene Breakdown Details -->
+                <div class="scene-breakdown-card hidden" id="scene-breakdown-card">
+                    <h3>Scene Breakdown</h3>
+                    <div class="scenes-list" id="scenes-list"></div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="app-footer">
+            <p>Unified Text-to-Video Engine • High-Performance Python & FFmpeg Architecture</p>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
