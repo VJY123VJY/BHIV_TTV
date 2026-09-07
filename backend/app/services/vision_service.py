@@ -15,7 +15,9 @@ class VisionService:
         char_refs = None
         if analysis:
             char_refs = {
-                "subject_description": f"{analysis.get('subject', 'subject')}, {analysis.get('mood', 'atmospheric')}, {analysis.get('lighting', 'sunset lighting')}"
+                "subject_description": f"{analysis.get('subject', 'subject')}, {analysis.get('mood', 'atmospheric')}",
+                "lighting": analysis.get("lighting", "natural lighting"),
+                "setting": analysis.get("setting", "environment")
             }
         return self.vision_adapter.enrich_scene_prompts(scenes, global_style, char_refs)
 

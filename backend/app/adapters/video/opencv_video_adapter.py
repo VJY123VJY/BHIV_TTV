@@ -46,9 +46,39 @@ class OpenCVVideoAdapter(BaseVideoAdapter):
         max_x_offset = large_w - width
         max_y_offset = large_h - height
 
-        # Particle seed for subtle atmospheric particles
-        rng = random.Random(abs(hash(scene.title)) % 5000)
-        particles = [{"x": rng.randint(0, width), "y": rng.randint(0, height), "speed": rng.uniform(0.5, 2.0), "size": rng.randint(1, 2)} for _ in range(30)]
+        # Dynamic particle seed for subtle atmospheric particles based on scene seed or random
+        scene_seed = scene.metadata.get("seed") if scene.metadata else None
+        if scene_seed is None:
+            scene_seed = random.randint(1, 2**31 - 1)
+        rng = random.Random(scene_seed + scene.index * 73)
+
+        desc_lower = (f"{scene.visual_description} {scene.narrative}").lower()
+        is_rain = "rain" in desc_lower
+        if is_rain:
+            particle_color = (240, 210, 150) # Rain streaks (BGR)
+            num_particles = 70
+        elif any(k in desc_lower for k in ["mars", "desert", "dust", "sand"]):
+            particle_color = (60, 110, 210) # Rust-red / golden dust
+            num_particles = 35
+        elif any(k in desc_lower for k in ["beach", "ocean", "sea", "water", "shore"]):
+            particle_color = (255, 245, 230) # White sea foam mist
+            num_particles = 25
+        elif any(k in desc_lower for k in ["space", "cosmic", "star", "galaxy"]):
+            particle_color = (255, 255, 255) # Brilliant stars
+            num_particles = 40
+        else:
+            particle_color = (200, 225, 240) # Natural atmospheric motes
+            num_particles = 30
+
+        particles = [
+            {
+                "x": rng.randint(0, width),
+                "y": rng.randint(0, height),
+                "speed": rng.uniform(2.5, 6.0) if is_rain else rng.uniform(0.5, 2.0),
+                "size": rng.randint(1, 2)
+            }
+            for _ in range(num_particles)
+        ]
 
         for t in range(total_frames):
             # Smooth cosine ease-in-out progress
@@ -90,16 +120,27 @@ class OpenCVVideoAdapter(BaseVideoAdapter):
             if motion not in ["zoom_in", "zoom_out"]:
                 frame = large_img[y_off:y_off + height, x_off:x_off + width].copy()
 
-            # Add subtle atmospheric dust particles drifting
+            # Add dynamic atmospheric particles / rain drifting
             for p in particles:
-                p["y"] -= p["speed"]
-                if p["y"] < 0:
-                    p["y"] = height
-                    p["x"] = rng.randint(0, width)
-                px = int(p["x"])
-                py = int(p["y"])
-                if 0 <= px < width and 0 <= py < height:
-                    cv2.circle(frame, (px, py), p["size"], (255, 220, 180), -1)
+                if is_rain:
+                    p["y"] += p["speed"]
+                    p["x"] -= p["speed"] * 0.25
+                    if p["y"] > height:
+                        p["y"] = 0
+                        p["x"] = rng.randint(0, width)
+                    px = int(p["x"])
+                    py = int(p["y"])
+                    if 0 <= px < width and 0 <= py < height:
+                        cv2.line(frame, (px, py), (px - 2, min(height - 1, py + 8)), particle_color, 1)
+                else:
+                    p["y"] -= p["speed"]
+                    if p["y"] < 0:
+                        p["y"] = height
+                        p["x"] = rng.randint(0, width)
+                    px = int(p["x"])
+                    py = int(p["y"])
+                    if 0 <= px < width and 0 <= py < height:
+                        cv2.circle(frame, (px, py), p["size"], particle_color, -1)
 
             out.write(frame)
 

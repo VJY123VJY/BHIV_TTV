@@ -122,7 +122,13 @@ class TextToVideoPipeline:
 
     # Stage 14: Return Result
     def return_result(self, metadata: Dict[str, Any], execution_id: str) -> Dict[str, Any]:
-        telemetry.emit("stage_14_return_result", execution_id, {"status": "success"})
+        telemetry.emit("stage_14_return_result", execution_id, {
+            "status": "success",
+            "generation_request_id": execution_id,
+            "output_filename": metadata.get("filename"),
+            "output_path": metadata.get("video_url"),
+            "processing_time_s": metadata.get("processing_time_s")
+        })
         return {
             "status": "success",
             "execution_id": execution_id,
@@ -145,7 +151,25 @@ class TextToVideoPipeline:
         """
         execution_id = job_id or generate_execution_id()
         start_time = time.time()
-        telemetry.emit("pipeline_execution_started", execution_id, {"prompt": prompt})
+        models_used = {
+            "llm": settings.LLM_PROVIDER,
+            "image": settings.IMAGE_PROVIDER,
+            "video": settings.VIDEO_PROVIDER,
+            "tts": settings.TTS_PROVIDER
+        }
+        gen_params = {
+            "duration": duration,
+            "style": style,
+            "voice": voice,
+            "fps": settings.DEFAULT_FPS,
+            "resolution": settings.DEFAULT_RESOLUTION
+        }
+        telemetry.emit("pipeline_execution_started", execution_id, {
+            "received_prompt": prompt,
+            "generation_request_id": execution_id,
+            "models_used": models_used,
+            "generation_parameters": gen_params
+        })
 
         # Helper to report progress
         async def _report(stage_name: str, pct: int):

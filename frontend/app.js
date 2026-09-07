@@ -174,7 +174,8 @@ document.addEventListener("DOMContentLoaded", () => {
         placeholderContent.classList.add("hidden");
         playerWrapper.classList.remove("hidden");
         
-        videoPlayer.src = result.video_url;
+        const cacheBustedUrl = `${result.video_url}?t=${Date.now()}`;
+        videoPlayer.src = cacheBustedUrl;
         videoPlayer.load();
         downloadBtn.href = result.video_url;
 

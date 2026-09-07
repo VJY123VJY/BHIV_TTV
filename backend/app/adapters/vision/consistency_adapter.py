@@ -6,7 +6,7 @@ class VisualConsistencyAdapter(BaseVisionConsistencyAdapter):
     """
     Enforces cross-scene visual consistency:
     - Character and subject identity retention
-    - Color palette & lighting continuity
+    - Color palette & lighting continuity derived from prompt
     - Environmental coherency
     - Consistent cinematic styling
     """
@@ -22,23 +22,29 @@ class VisualConsistencyAdapter(BaseVisionConsistencyAdapter):
         style_key = global_style.lower()
         style_prompt = self.STYLE_PRESETS.get(style_key, self.STYLE_PRESETS["cinematic"])
 
-        # Default character anchor if not provided
-        char_anchor = "consistent character subject, matching wardrobe and physical proportions"
-        if character_refs and "subject_description" in character_refs:
-            char_anchor = character_refs["subject_description"]
+        char_anchor = "consistent subject appearance and proportions"
+        lighting_tag = "natural ambient lighting"
+        setting_tag = "cohesive landscape"
+
+        if character_refs:
+            if "subject_description" in character_refs:
+                char_anchor = character_refs["subject_description"]
+            if "lighting" in character_refs:
+                lighting_tag = character_refs["lighting"]
+            if "setting" in character_refs:
+                setting_tag = character_refs["setting"]
 
         for i, scene in enumerate(scenes):
-            # Formulate enriched visual prompt with continuity anchors
-            lighting_tag = "golden hour sunset tones, deep purple and amber gradients, consistent directional shadows"
-            continuity_tag = f"Scene {scene.index} continuity: matches visual palette of preceding scenes; {char_anchor}"
+            continuity_tag = f"Scene {scene.index} continuity: matches environment of {setting_tag}; {char_anchor}"
             
             enriched = (
-                f"{scene.visual_description}. "
-                f"Visual Style: {style_prompt}. "
+                f"{scene.visual_description} "
+                f"Style: {style_prompt}. "
                 f"Lighting: {lighting_tag}. "
                 f"Continuity: {continuity_tag}."
             )
             scene.metadata["enriched_prompt"] = enriched
             scene.metadata["style_preset"] = style_key
+            scene.metadata["detected_setting"] = setting_tag
 
         return scenes

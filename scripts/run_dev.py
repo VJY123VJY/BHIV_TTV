@@ -10,5 +10,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 if __name__ == "__main__":
     import uvicorn
-    print(f"Starting Unified Text-to-Video Engine on http://localhost:8000 ...")
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    from app.core.config import settings
+
+    print(f"Starting Unified Text-to-Video Engine on http://localhost:{settings.PORT} ...")
+    uvicorn.run("app.main:app", host=settings.HOST, port=settings.PORT, reload=True)
