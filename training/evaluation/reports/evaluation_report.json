@@ -1,0 +1,258 @@
+{
+  "timestamp": "2026-09-07T09:47:13.093674Z",
+  "evaluated_samples": 20,
+  "summary": {
+    "prompt_adherence_mean": 0.6875,
+    "prompt_adherence_std": 0.1083,
+    "temporal_consistency_mean": 0.8171,
+    "temporal_consistency_std": 0.1156,
+    "visual_quality_mean": 0.6032,
+    "visual_quality_std": 0.2247,
+    "motion_consistency_mean": 0.6625,
+    "motion_consistency_std": 0.1441,
+    "composite_score_mean": 0.7045,
+    "composite_score_std": 0.0452
+  },
+  "per_sample": [
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_072037_090cc6ac.mp4",
+      "prompt": "A small rover roaming the dunes of Mars.",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.75,
+        "temporal_consistency": 0.6788,
+        "visual_quality": 0.7862,
+        "motion_consistency": 0.8101,
+        "composite_score": 0.7479
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_072102_5f9a7088.mp4",
+      "prompt": "A scientist in a clean laboratory observing glowing crystals.",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.5,
+        "temporal_consistency": 0.6635,
+        "visual_quality": 0.7926,
+        "motion_consistency": 0.8238,
+        "composite_score": 0.6723
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_072207_d6031e3c.mp4",
+      "prompt": "A small rover roaming the dunes of Mars.",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.75,
+        "temporal_consistency": 0.6878,
+        "visual_quality": 0.7937,
+        "motion_consistency": 0.8279,
+        "composite_score": 0.7557
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_072229_9551eda6.mp4",
+      "prompt": "A scientist in a clean laboratory observing glowing crystals.",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.5,
+        "temporal_consistency": 0.6976,
+        "visual_quality": 0.7895,
+        "motion_consistency": 0.8202,
+        "composite_score": 0.6812
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_072304_2c1c6d4e.mp4",
+      "prompt": "A small robot explores a futuristic city at sunset.",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.75,
+        "temporal_consistency": 0.6692,
+        "visual_quality": 0.7965,
+        "motion_consistency": 0.8068,
+        "composite_score": 0.7464
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_074044_ea89020f.mp4",
+      "prompt": "A small robot explores a futuristic city at sunset.",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.75,
+        "temporal_consistency": 0.7056,
+        "visual_quality": 0.7929,
+        "motion_consistency": 0.7928,
+        "composite_score": 0.7538
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_074154_5a6a35fe.mp4",
+      "prompt": "A futuristic city at sunset, with flying cars moving between skyscrapers while the camera smoothly flies through the streets.",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.75,
+        "temporal_consistency": 0.6805,
+        "visual_quality": 0.7974,
+        "motion_consistency": 0.8238,
+        "composite_score": 0.7534
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_074339_05d4ce10.mp4",
+      "prompt": "A red sports car driving through a snowy mountain road at sunrise, cinematic camera movement.",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.75,
+        "temporal_consistency": 0.7011,
+        "visual_quality": 0.7948,
+        "motion_consistency": 0.8017,
+        "composite_score": 0.7546
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_090427_25b79e78.mp4",
+      "prompt": "A small rover roaming the dunes of Mars.",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.75,
+        "temporal_consistency": 0.9411,
+        "visual_quality": 0.2682,
+        "motion_consistency": 0.6006,
+        "composite_score": 0.6811
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_090436_b414c115.mp4",
+      "prompt": "A scientist in a clean laboratory observing glowing crystals.",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.5,
+        "temporal_consistency": 0.9424,
+        "visual_quality": 0.4002,
+        "motion_consistency": 0.558,
+        "composite_score": 0.6244
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_090527_157e2fa4.mp4",
+      "prompt": "A golden retriever dog running joyfully on a sunny tropical beach with ocean waves",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.75,
+        "temporal_consistency": 0.88,
+        "visual_quality": 0.701,
+        "motion_consistency": 0.6445,
+        "composite_score": 0.7581
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_090539_1504f424.mp4",
+      "prompt": "An astronaut walking slowly across the red dusty dunes of planet Mars under a dark sky",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.75,
+        "temporal_consistency": 0.9314,
+        "visual_quality": 0.3239,
+        "motion_consistency": 0.6339,
+        "composite_score": 0.696
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_090551_bb7da10c.mp4",
+      "prompt": "A futuristic sports car racing through neon rain on a cybernetic highway at midnight",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.75,
+        "temporal_consistency": 0.7982,
+        "visual_quality": 0.8343,
+        "motion_consistency": 0.3553,
+        "composite_score": 0.7024
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_090820_bde6c3e5.mp4",
+      "prompt": "A futuristic sports car racing through neon rain on a cybernetic highway at midnight\"",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.75,
+        "temporal_consistency": 0.7918,
+        "visual_quality": 0.8158,
+        "motion_consistency": 0.362,
+        "composite_score": 0.6981
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_090858_f0bc2d77.mp4",
+      "prompt": "\"An astronaut walking slowly across the red dusty dunes of planet Mars under a dark sky",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.75,
+        "temporal_consistency": 0.9326,
+        "visual_quality": 0.3268,
+        "motion_consistency": 0.6319,
+        "composite_score": 0.6965
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_091124_ceb7d7f8.mp4",
+      "prompt": "A golden retriever running on a sunny beach while waves gently hit the shore, realistic cinematic video.",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.75,
+        "temporal_consistency": 0.879,
+        "visual_quality": 0.6992,
+        "motion_consistency": 0.6411,
+        "composite_score": 0.7568
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_092756_91eaf00f.mp4",
+      "prompt": "A small rover roaming the dunes of Mars.",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.75,
+        "temporal_consistency": 0.9387,
+        "visual_quality": 0.2744,
+        "motion_consistency": 0.6049,
+        "composite_score": 0.6824
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_092810_bebb6701.mp4",
+      "prompt": "A scientist in a clean laboratory observing glowing crystals.",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.5,
+        "temporal_consistency": 0.9422,
+        "visual_quality": 0.3986,
+        "motion_consistency": 0.5848,
+        "composite_score": 0.6293
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_093954_8dc63141.mp4",
+      "prompt": "A small rover roaming the dunes of Mars.",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.75,
+        "temporal_consistency": 0.9391,
+        "visual_quality": 0.277,
+        "motion_consistency": 0.5439,
+        "composite_score": 0.6709
+      }
+    },
+    {
+      "video_path": "C:\\Users\\vijay\\OneDrive\\Desktop\\text_to_video_final\\generated\\videos\\exec_20260907_094009_05ab4253.mp4",
+      "prompt": "A scientist in a clean laboratory observing glowing crystals.",
+      "frame_count_evaluated": 16,
+      "metrics": {
+        "prompt_adherence": 0.5,
+        "temporal_consistency": 0.9417,
+        "visual_quality": 0.402,
+        "motion_consistency": 0.5824,
+        "composite_score": 0.6294
+      }
+    }
+  ]
+}

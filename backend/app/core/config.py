@@ -1,4 +1,5 @@
 import os
+from typing import Optional, List, Dict
 from pathlib import Path
 from pydantic_settings import BaseSettings
 from pydantic import Field
@@ -25,6 +26,10 @@ class Settings(BaseSettings):
     VIDEO_PROVIDER: str = "opencv"
     TTS_PROVIDER: str = "local"
     VISION_PROVIDER: str = "standard"
+
+    # Model Mode (base | finetuned)
+    MODEL_MODE: str = "base"
+    FINE_TUNED_CHECKPOINT_PATH: Optional[str] = None
 
     # API Keys
     OPENAI_API_KEY: str = ""

@@ -7,8 +7,9 @@ from app.core.exceptions import VisualGenerationError
 
 class VideoService:
     """Orchestrates scene video rendering from keyframes."""
-    def __init__(self):
-        self.video_adapter = get_video_adapter(settings.VIDEO_PROVIDER)
+    @property
+    def video_adapter(self):
+        return get_video_adapter(settings.VIDEO_PROVIDER)
 
     async def generate_scene_videos(self, scenes: List[Scene], execution_id: str, fps: int = 24) -> List[Scene]:
         scenes_dir = settings.get_absolute_path(settings.SCENES_DIR)

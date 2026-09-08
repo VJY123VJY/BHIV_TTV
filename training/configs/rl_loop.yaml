@@ -1,0 +1,23 @@
+# Reinforcement Learning / Direct Preference Feedback Loop Configuration
+rl:
+  iterations: 3
+  num_candidates: 3
+  beta: 0.1
+  learning_rate: 0.00005
+  use_lora: true
+  lora_rank: 4
+
+rewards:
+  weights:
+    prompt: 0.35
+    temporal: 0.35
+    aesthetic: 0.20
+    human: 0.10
+
+model:
+  name: "spatial_temporal_ttv_v1"
+  latent_channels: 64
+  num_frames: 8
+  max_prompt_length: 32
+
+output_dir: "training/rl/runs"

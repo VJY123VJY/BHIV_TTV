@@ -1,0 +1,124 @@
+import os
+import sys
+import yaml
+import argparse
+from pathlib import Path
+
+# Add project root to sys.path
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from training.datasets.manifest_builder import build_manifest_from_directory
+from training.datasets.loader import create_dataloader
+from training.fine_tuning.model import SpatialTemporalTTVModel
+from training.fine_tuning.trainer import TTVTrainer
+from training.utils.versioning import ModelRegistry
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Train / Fine-Tune TTV Model")
+    parser.add_argument("--config", type=str, default="training/configs/smoke_test.yaml", help="Path to YAML config")
+    parser.add_argument("--resume", type=str, default=None, help="Optional checkpoint path to resume from")
+    parser.add_argument("--version-name", type=str, default="ttv_lora_v001", help="Model version tag to register")
+    args = parser.parse_args()
+
+    config_path = Path(args.config)
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {args.config}")
+
+    with open(config_path, "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+
+    # 1. Ensure dataset manifest exists
+    manifest_path = PROJECT_ROOT / cfg["paths"]["dataset_manifest"]
+    if not manifest_path.exists():
+        print(f"[Dataset] Manifest {manifest_path} not found. Automatically building from generated/videos...")
+        build_manifest_from_directory(
+            videos_dir=str(PROJECT_ROOT / "generated" / "videos"),
+            output_manifest_path=str(manifest_path)
+        )
+
+    # 2. Build DataLoaders
+    train_manifest = PROJECT_ROOT / cfg["paths"].get("train_manifest", cfg["paths"]["dataset_manifest"])
+    val_manifest = PROJECT_ROOT / cfg["paths"].get("val_manifest", cfg["paths"]["dataset_manifest"])
+
+    if not train_manifest.exists():
+        train_manifest = manifest_path
+    if not val_manifest.exists():
+        val_manifest = manifest_path
+
+    train_cfg = cfg.get("training", {})
+    model_cfg = cfg.get("model", {})
+    prep_cfg = cfg.get("preprocessing", {})
+
+    train_loader = create_dataloader(
+        manifest_path=str(train_manifest),
+        batch_size=train_cfg.get("batch_size", 1),
+        num_frames=model_cfg.get("num_frames", 8),
+        height=prep_cfg.get("height", 128),
+        width=prep_cfg.get("width", 128),
+        max_prompt_length=model_cfg.get("max_prompt_length", 32),
+        vocab_size=model_cfg.get("vocab_size", 10000),
+        shuffle=True
+    )
+
+    val_loader = create_dataloader(
+        manifest_path=str(val_manifest),
+        batch_size=train_cfg.get("batch_size", 1),
+        num_frames=model_cfg.get("num_frames", 8),
+        height=prep_cfg.get("height", 128),
+        width=prep_cfg.get("width", 128),
+        max_prompt_length=model_cfg.get("max_prompt_length", 32),
+        vocab_size=model_cfg.get("vocab_size", 10000),
+        shuffle=False
+    )
+
+    # 3. Instantiate model
+    model = SpatialTemporalTTVModel(
+        in_channels=model_cfg.get("in_channels", 3),
+        latent_channels=model_cfg.get("latent_channels", 64),
+        num_frames=model_cfg.get("num_frames", 8),
+        vocab_size=model_cfg.get("vocab_size", 10000),
+        max_prompt_length=model_cfg.get("max_prompt_length", 32),
+        text_embed_dim=model_cfg.get("text_embed_dim", 128)
+    )
+
+    # 4. Trainer
+    trainer = TTVTrainer(
+        model=model,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        config=train_cfg,
+        checkpoint_dir=str(PROJECT_ROOT / cfg["paths"].get("checkpoint_dir", "training/checkpoints"))
+    )
+
+    if args.resume:
+        trainer.resume_from_checkpoint(args.resume)
+
+    # 5. Execute Training
+    results = trainer.train()
+
+    # 6. Register versioned model
+    registry = ModelRegistry(str(PROJECT_ROOT / cfg["paths"].get("models_dir", "models")))
+    manifest = registry.register_version(
+        version_name=args.version_name,
+        checkpoint_path=results["final_checkpoint"],
+        base_model=model_cfg.get("name", "spatial_temporal_ttv_v1"),
+        config=cfg,
+        metrics={
+            "best_val_loss": results["best_val_loss"],
+            "elapsed_seconds": results["elapsed_seconds"],
+            "final_epoch": len(results["history"])
+        }
+    )
+
+    print("\n" + "=" * 60)
+    print(f"TRAINING COMPLETED SUCCESSFULLY!")
+    print(f"Version:         {args.version_name}")
+    print(f"Best Val Loss:   {results['best_val_loss']:.4f}")
+    print(f"Checkpoint Path: {results['final_checkpoint']}")
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    main()

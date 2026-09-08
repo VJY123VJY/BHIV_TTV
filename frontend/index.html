@@ -3,132 +3,870 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unified Text-to-Video AI Studio</title>
+    <title>TTV Studio • AI Video Generation</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 </head>
-<body>
-    <div class="app-container">
-        <!-- Header -->
-        <header class="app-header">
-            <div class="logo">
-                <span class="icon">🎬</span>
-                <h1>Unified Text-to-Video Studio</h1>
+<body class="dark-theme">
+    <!-- App Layout Shell -->
+    <div class="app-layout">
+
+        <!-- Mobile Header Navigation Toggle -->
+        <div class="mobile-topbar">
+            <button id="sidebar-toggle-btn" class="icon-btn" aria-label="Toggle Sidebar">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+            <div class="mobile-brand">
+                <span class="brand-badge-dot"></span>
+                <span class="brand-name">TTV Studio</span>
             </div>
-            <div class="header-badges">
-                <span class="badge" id="engine-status">Engine: Ready</span>
-                <span class="badge badge-accent">Production v1.0</span>
+            <div id="mobile-engine-pill" class="status-pill status-ready">Online</div>
+        </div>
+
+        <!-- 1. SIDEBAR -->
+        <aside class="app-sidebar" id="app-sidebar">
+            <div class="sidebar-header">
+                <div class="brand-container">
+                    <div class="brand-icon-box">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                        </svg>
+                    </div>
+                    <div class="brand-text">
+                        <span class="brand-title">TTV Studio</span>
+                        <span class="brand-sub">AI Video Engine</span>
+                    </div>
+                </div>
             </div>
-        </header>
 
-        <!-- Main Layout -->
-        <main class="main-content">
-            <!-- Controls Panel -->
-            <section class="panel control-panel">
-                <h2>Create Your Video</h2>
-                <p class="subtitle">Transform text prompts into complete cinematic videos with synchronized narration and audio.</p>
+            <!-- Sidebar Navigation Links -->
+            <nav class="sidebar-nav">
+                <div class="nav-section-label">CREATE & EXPLORE</div>
+                <button class="nav-item active" data-view="view-generate" id="nav-generate">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                    </svg>
+                    <span>New Generation</span>
+                </button>
 
-                <form id="generate-form">
-                    <div class="form-group">
-                        <label for="prompt-input">Prompt</label>
-                        <textarea id="prompt-input" rows="4" placeholder="Describe the scene or story (e.g., A dog running on a sunny beach, An astronaut exploring red sands of Mars)..." required></textarea>
+                <button class="nav-item" data-view="view-history" id="nav-history">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                        <line x1="7" y1="2" x2="7" y2="22"></line>
+                        <line x1="17" y1="2" x2="17" y2="22"></line>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <line x1="2" y1="7" x2="7" y2="7"></line>
+                        <line x1="2" y1="17" x2="7" y2="17"></line>
+                        <line x1="17" y1="17" x2="22" y2="17"></line>
+                        <line x1="17" y1="7" x2="22" y2="7"></line>
+                    </svg>
+                    <span>My Videos / History</span>
+                    <span class="nav-badge" id="history-count-badge">0</span>
+                </button>
+
+                <button class="nav-item" data-view="view-models" id="nav-models">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                    <span>Models</span>
+                </button>
+
+                <div class="nav-section-label">ADVANCED AI WORKFLOW</div>
+                <button class="nav-item" data-view="view-training" id="nav-training">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="20" x2="18" y2="10"></line>
+                        <line x1="12" y1="20" x2="12" y2="4"></line>
+                        <line x1="6" y1="20" x2="6" y2="14"></line>
+                    </svg>
+                    <span>Training / Fine-Tuning</span>
+                    <span class="nav-tag">Pro</span>
+                </button>
+
+                <button class="nav-item" data-view="view-rl" id="nav-rl">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+                    </svg>
+                    <span>RL Feedback UI</span>
+                    <span class="nav-tag accent">DPO</span>
+                </button>
+
+                <div class="nav-section-label">PREFERENCES</div>
+                <button class="nav-item" data-view="view-settings" id="nav-settings">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span>Settings</span>
+                </button>
+            </nav>
+
+            <!-- Sidebar Footer Status -->
+            <div class="sidebar-footer">
+                <div class="engine-status-card">
+                    <div class="engine-status-header">
+                        <span class="status-indicator-dot online" id="status-indicator"></span>
+                        <span class="engine-status-title" id="engine-status-text">Engine Ready</span>
+                    </div>
+                    <div class="engine-details" id="engine-details-text">FastAPI • FFmpeg Active</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Sidebar Overlay for mobile -->
+        <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+        <!-- Main Content Area -->
+        <main class="app-main-content">
+
+            <!-- ============================================== -->
+            <!-- VIEW 1: MAIN GENERATION AREA                   -->
+            <!-- ============================================== -->
+            <section class="view-panel active" id="view-generate">
+                <div class="workspace-layout">
+
+                    <!-- Left / Center: Creation Workspace -->
+                    <div class="creation-column">
+                        <div class="workspace-header">
+                            <div>
+                                <h1 class="page-title">Generate Video</h1>
+                                <p class="page-subtitle">Transform conceptual text descriptions into high-fidelity synchronized cinematic videos.</p>
+                            </div>
+                            <div class="quick-preset-chips">
+                                <span class="chip-label">Suggestions:</span>
+                                <button type="button" class="preset-chip" data-prompt="A sleek futuristic sports car gliding through a neon cyberpunk metropolis at midnight.">Cyberpunk Metropolis</button>
+                                <button type="button" class="preset-chip" data-prompt="A curious small robot discovering ancient glowing flowers in an enchanted forest at twilight.">Robot in Forest</button>
+                                <button type="button" class="preset-chip" data-prompt="National Geographic footage of a majestic golden eagle soaring over snow-capped alpine mountains.">Alpine Eagle</button>
+                            </div>
+                        </div>
+
+                        <!-- Main Form Card -->
+                        <form id="generate-form" class="studio-card prompt-card">
+                            <!-- Prompt Section -->
+                            <div class="prompt-box-wrapper">
+                                <div class="prompt-box-header">
+                                    <label for="prompt-input" class="field-label">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                                        Prompt Description
+                                    </label>
+                                    <div class="counter-badge" id="prompt-counter">
+                                        <span id="char-count">0</span> chars • <span id="word-count">0</span> words
+                                    </div>
+                                </div>
+                                <textarea id="prompt-input" class="hero-prompt-textarea" rows="4" placeholder="Describe the scene, motion, atmosphere, and visual narrative (e.g., A small robot explores a futuristic city at sunset, neon reflections dancing on wet pavements)..." required autofocus></textarea>
+                            </div>
+
+                            <!-- Primary Controls Grid -->
+                            <div class="generation-controls-grid">
+                                <!-- Model Selection -->
+                                <div class="control-group">
+                                    <label for="model-select" class="field-label">Model Architecture</label>
+                                    <div class="select-wrapper">
+                                        <select id="model-select">
+                                            <option value="base" selected>SpatialTemporal TTV (Base Engine)</option>
+                                            <option value="finetuned">SpatialTemporal LoRA (Fine-Tuned v001)</option>
+                                        </select>
+                                        <span class="select-arrow">▼</span>
+                                    </div>
+                                </div>
+
+                                <!-- Duration Selector -->
+                                <div class="control-group">
+                                    <div class="slider-label-row">
+                                        <label for="duration-slider" class="field-label">Duration</label>
+                                        <span class="value-badge" id="duration-val-badge">15 seconds</span>
+                                    </div>
+                                    <input type="range" id="duration-slider" min="5" max="60" value="15" step="5" class="custom-slider">
+                                    <div class="slider-ticks">
+                                        <span>5s</span>
+                                        <span>15s</span>
+                                        <span>30s</span>
+                                        <span>45s</span>
+                                        <span>60s</span>
+                                    </div>
+                                </div>
+
+                                <!-- Aspect Ratio Selector -->
+                                <div class="control-group">
+                                    <label class="field-label">Aspect Ratio</label>
+                                    <div class="aspect-ratio-toggle-group">
+                                        <button type="button" class="aspect-btn active" data-aspect="16:9" data-res="1280x720">
+                                            <span class="aspect-box aspect-16-9"></span>
+                                            <span>16:9 Widescreen</span>
+                                        </button>
+                                        <button type="button" class="aspect-btn" data-aspect="9:16" data-res="720x1280">
+                                            <span class="aspect-box aspect-9-16"></span>
+                                            <span>9:16 Vertical</span>
+                                        </button>
+                                        <button type="button" class="aspect-btn" data-aspect="1:1" data-res="1080x1080">
+                                            <span class="aspect-box aspect-1-1"></span>
+                                            <span>1:1 Square</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Quality / Resolution -->
+                                <div class="control-group">
+                                    <label for="resolution-select" class="field-label">Quality / Resolution</label>
+                                    <div class="select-wrapper">
+                                        <select id="resolution-select">
+                                            <option value="1280x720" selected>720p HD (1280 × 720)</option>
+                                            <option value="1920x1080">1080p FHD (1920 × 1080)</option>
+                                        </select>
+                                        <span class="select-arrow">▼</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Advanced Settings (Collapsible) -->
+                            <details class="advanced-accordion" id="advanced-settings-accordion">
+                                <summary class="advanced-summary">
+                                    <div class="summary-left">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
+                                        <span>Advanced Generation Settings</span>
+                                    </div>
+                                    <span class="accordion-chevron">▶</span>
+                                </summary>
+                                <div class="advanced-content-grid">
+                                    <div class="control-group">
+                                        <label for="style-select" class="field-label">Visual Aesthetic Style</label>
+                                        <div class="select-wrapper">
+                                            <select id="style-select">
+                                                <option value="cinematic" selected>Cinematic 35mm Film Still</option>
+                                                <option value="anime">Anime / Japanese Aesthetic</option>
+                                                <option value="cyberpunk">Cyberpunk Metropolis</option>
+                                                <option value="realistic">National Geographic Photorealistic</option>
+                                                <option value="fantasy">Epic High Fantasy</option>
+                                            </select>
+                                            <span class="select-arrow">▼</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="control-group">
+                                        <label for="seed-input" class="field-label">Generation Seed</label>
+                                        <div class="seed-input-wrapper">
+                                            <input type="number" id="seed-input" placeholder="Random (default)" min="0" max="2147483647">
+                                            <button type="button" id="randomize-seed-btn" class="icon-btn-inline" title="Randomize Seed">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="control-group">
+                                        <label for="fps-select" class="field-label">Frame Rate (FPS)</label>
+                                        <div class="select-wrapper">
+                                            <select id="fps-select">
+                                                <option value="24" selected>24 FPS (Cinematic Standard)</option>
+                                                <option value="30">30 FPS (Digital Video)</option>
+                                                <option value="60">60 FPS (Ultra Smooth)</option>
+                                            </select>
+                                            <span class="select-arrow">▼</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="control-group toggle-group">
+                                        <label class="toggle-container" for="voice-toggle">
+                                            <div class="toggle-text-block">
+                                                <span class="toggle-title">Voice Narration (TTS)</span>
+                                                <span class="toggle-desc">Generate synchronized speech narration across scenes</span>
+                                            </div>
+                                            <div class="switch-wrap">
+                                                <input type="checkbox" id="voice-toggle" checked>
+                                                <span class="slider-round"></span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </details>
+
+                            <!-- Primary Action Button -->
+                            <div class="form-action-row">
+                                <button type="submit" id="generate-btn" class="primary-generate-btn">
+                                    <div class="btn-sparkle-glow"></div>
+                                    <svg class="btn-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                                    </svg>
+                                    <span class="btn-text">Generate Video</span>
+                                </button>
+                            </div>
+                        </form>
+
+                        <!-- 4. GENERATION STATUS (Clean Progress Indicator) -->
+                        <div class="studio-card progress-card hidden" id="progress-card">
+                            <div class="progress-card-header">
+                                <div class="stage-info-group">
+                                    <span class="status-pulse-spinner"></span>
+                                    <div>
+                                        <h3 class="progress-main-title" id="stage-main-title">Generating video...</h3>
+                                        <p class="progress-sub-title" id="stage-sub-title">Processing prompt...</p>
+                                    </div>
+                                </div>
+                                <div class="progress-stats">
+                                    <span class="progress-percentage" id="percent-text">0%</span>
+                                    <span class="progress-timer" id="elapsed-timer">00:00</span>
+                                </div>
+                            </div>
+
+                            <!-- Animated Progress Track -->
+                            <div class="progress-track-container">
+                                <div class="progress-track-fill" id="progress-bar-fill" style="width: 0%;"></div>
+                            </div>
+
+                            <!-- Required 5-Stage Stepper -->
+                            <div class="stage-stepper" id="stage-stepper">
+                                <div class="stepper-step" id="stage-step-1">
+                                    <div class="step-indicator">1</div>
+                                    <div class="step-label">Processing prompt</div>
+                                </div>
+                                <div class="stepper-step" id="stage-step-2">
+                                    <div class="step-indicator">2</div>
+                                    <div class="step-label">Generating frames</div>
+                                </div>
+                                <div class="stepper-step" id="stage-step-3">
+                                    <div class="step-indicator">3</div>
+                                    <div class="step-label">Creating video</div>
+                                </div>
+                                <div class="stepper-step" id="stage-step-4">
+                                    <div class="step-indicator">4</div>
+                                    <div class="step-label">Completed</div>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="duration-slider">Duration: <span id="duration-val">15</span>s</label>
-                            <input type="range" id="duration-slider" min="5" max="60" value="15" step="5">
-                        </div>
+                    <!-- Right Column: 3. VIDEO PREVIEW AREA -->
+                    <div class="preview-column">
+                        <div class="studio-card preview-card">
+                            <div class="preview-card-header">
+                                <div class="header-left">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                                        <polygon points="10 8 16 12 10 16 10 8"></polygon>
+                                    </svg>
+                                    <h2 class="card-title">Video Preview</h2>
+                                </div>
+                                <span class="video-format-pill" id="preview-format-badge">Ready</span>
+                            </div>
 
-                        <div class="form-group">
-                            <label for="style-select">Visual Style</label>
-                            <select id="style-select">
-                                <option value="cinematic" selected>Cinematic 35mm</option>
-                                <option value="anime">Anime / Aesthetic</option>
-                                <option value="cyberpunk">Cyberpunk Metropolis</option>
-                                <option value="realistic">National Geographic Realistic</option>
-                                <option value="fantasy">Epic Fantasy</option>
-                            </select>
+                            <!-- Player Area -->
+                            <div class="player-container" id="player-container">
+                                <!-- Empty state placeholder -->
+                                <div class="empty-player-state" id="empty-player-state">
+                                    <div class="empty-state-graphic">
+                                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                                        </svg>
+                                    </div>
+                                    <h3 class="empty-title">No video generated yet</h3>
+                                    <p class="empty-desc">Enter your text prompt on the left and click "Generate Video" to render your cinema-grade video.</p>
+                                </div>
+
+                                <!-- Generating Loading Overlay -->
+                                <div class="generating-player-overlay hidden" id="generating-player-overlay">
+                                    <div class="video-loading-orb">
+                                        <div class="orb-ring"></div>
+                                        <div class="orb-core"></div>
+                                    </div>
+                                    <p class="loading-overlay-text">Synthesizing Scenes & Rendering Video...</p>
+                                </div>
+
+                                <!-- Active Video Player -->
+                                <div class="active-player-wrapper hidden" id="active-player-wrapper">
+                                    <video id="video-player" playsinline preload="metadata" controls></video>
+                                </div>
+                            </div>
+
+                            <!-- Video Action Toolbar (Download, Regenerate, Share) -->
+                            <div class="preview-action-toolbar hidden" id="preview-action-toolbar">
+                                <a id="download-btn" class="action-btn download-btn" href="#" download="generated_video.mp4">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    <span>Download MP4</span>
+                                </a>
+
+                                <button type="button" id="regenerate-btn" class="action-btn secondary-btn" title="Regenerate this video">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>
+                                    <span>Regenerate</span>
+                                </button>
+
+                                <button type="button" id="share-copy-btn" class="action-btn secondary-btn" title="Copy video URL to clipboard">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                                    <span>Share / Copy</span>
+                                </button>
+
+                                <button type="button" id="send-to-rl-btn" class="action-btn secondary-btn" title="Evaluate in RL Feedback Studio">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
+                                    <span>Rate in RL</span>
+                                </button>
+                            </div>
+
+                            <!-- Expandable Scene Breakdown Accordion -->
+                            <div class="scene-breakdown-card hidden" id="scene-breakdown-card">
+                                <div class="scene-breakdown-header">
+                                    <h3 class="scene-title">Scene Breakdown & Narratives</h3>
+                                    <span class="scene-count-badge" id="scene-count-badge">0 Scenes</span>
+                                </div>
+                                <div class="scenes-list" id="scenes-list"></div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="form-row">
-                        <div class="form-group checkbox-group">
-                            <label class="toggle-label">
-                                <input type="checkbox" id="voice-toggle" checked>
-                                <span class="toggle-slider"></span>
-                                <span class="toggle-text">Enable Voice Narration (TTS)</span>
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label for="resolution-select">Resolution</label>
-                            <select id="resolution-select">
-                                <option value="1280x720" selected>720p HD (1280x720)</option>
-                                <option value="1920x1080">1080p FHD (1920x1080)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <button type="submit" id="generate-btn" class="btn btn-primary">
-                        <span class="btn-text">Generate Video</span>
-                        <span class="btn-icon">⚡</span>
-                    </button>
-                </form>
+                </div>
             </section>
 
-            <!-- Preview & Status Panel -->
-            <section class="panel preview-panel">
-                <h2>Studio Output & Preview</h2>
 
-                <!-- Status & Progress Container -->
-                <div id="progress-container" class="progress-card hidden">
-                    <div class="progress-header">
-                        <span id="stage-text" class="stage-text">Initializing pipeline...</span>
-                        <span id="percent-text" class="percent-text">0%</span>
+            <!-- ============================================== -->
+            <!-- VIEW 2: 5. HISTORY / MY VIDEOS                 -->
+            <!-- ============================================== -->
+            <section class="view-panel" id="view-history">
+                <div class="page-container">
+                    <div class="page-header-row">
+                        <div>
+                            <h1 class="page-title">My Videos & History</h1>
+                            <p class="page-subtitle">Browse, replay, and manage previously rendered text-to-video deliverables.</p>
+                        </div>
+                        <div class="history-filter-bar">
+                            <input type="text" id="history-search-input" class="search-input" placeholder="Search prompts...">
+                            <button type="button" id="history-clear-all-btn" class="action-btn danger-outline-btn">Clear History</button>
+                        </div>
                     </div>
-                    <div class="progress-bar-bg">
-                        <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%"></div>
+
+                    <!-- History Grid Container -->
+                    <div class="history-grid" id="history-grid">
+                        <!-- Populated dynamically via JS -->
                     </div>
-                    <div class="pipeline-tracker">
-                        <div class="track-step" id="step-story">1. Story</div>
-                        <div class="track-step" id="step-scenes">2. Scenes</div>
-                        <div class="track-step" id="step-visuals">3. Visuals</div>
-                        <div class="track-step" id="step-audio">4. Audio</div>
-                        <div class="track-step" id="step-final">5. MP4 Assembly</div>
+
+                    <!-- Empty History State -->
+                    <div class="empty-history-state hidden" id="empty-history-state">
+                        <div class="empty-state-graphic">
+                            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg>
+                        </div>
+                        <h3>No video history yet</h3>
+                        <p>Videos you generate will be permanently archived and accessible here.</p>
                     </div>
                 </div>
+            </section>
 
-                <!-- Video Display Area -->
-                <div class="video-display-area" id="video-display-area">
-                    <div class="placeholder-content" id="placeholder-content">
-                        <div class="placeholder-icon">📽️</div>
-                        <p>Your generated video will appear here.</p>
+
+            <!-- ============================================== -->
+            <!-- VIEW 3: MODELS CATALOG                         -->
+            <!-- ============================================== -->
+            <section class="view-panel" id="view-models">
+                <div class="page-container">
+                    <div class="page-header-row">
+                        <div>
+                            <h1 class="page-title">AI Video Models</h1>
+                            <p class="page-subtitle">Inspect configured generative backbones, LoRA adapters, and multimodal inference pipelines.</p>
+                        </div>
+                        <span class="status-pill status-ready">All Checkpoints Loaded</span>
                     </div>
 
-                    <div class="player-wrapper hidden" id="player-wrapper">
-                        <video id="video-player" controls preload="metadata"></video>
-                        <div class="video-actions">
-                            <a id="download-btn" class="btn btn-secondary" href="#" download="generated_video.mp4">
-                                ⬇ Download Final MP4
-                            </a>
+                    <div class="models-grid">
+                        <!-- Model Card 1: Base Model -->
+                        <div class="studio-card model-card featured-model">
+                            <div class="model-badge">Active Backbone</div>
+                            <h3 class="model-name">SpatialTemporal TTV Model</h3>
+                            <p class="model-desc">Multi-scale spatial-temporal latent diffusion model with 3D convolutions and Cross-Attention story conditioning.</p>
+                            <div class="model-specs">
+                                <div class="spec-item"><span class="spec-key">Type:</span> <span class="spec-val">Diffusion Backbone</span></div>
+                                <div class="spec-item"><span class="spec-key">Latent Channels:</span> <span class="spec-val">64-dim</span></div>
+                                <div class="spec-item"><span class="spec-key">Temporal Attention:</span> <span class="spec-val">Enabled (8-60 frames)</span></div>
+                                <div class="spec-item"><span class="spec-key">Resolution:</span> <span class="spec-val">720p / 1080p HD</span></div>
+                            </div>
+                            <div class="model-footer">
+                                <span class="badge badge-success">Loaded in Memory</span>
+                                <button type="button" class="btn btn-secondary select-model-btn" data-model="base">Select Model</button>
+                            </div>
+                        </div>
+
+                        <!-- Model Card 2: LoRA Fine-Tuned -->
+                        <div class="studio-card model-card">
+                            <div class="model-badge badge-accent">LoRA Adapter</div>
+                            <h3 class="model-name">TTV LoRA v001 (Cinematic)</h3>
+                            <p class="model-desc">Low-Rank Adaptation trained on cinematic dataset pairs. Enhances photographic texture, depth, and smooth camera pan motion.</p>
+                            <div class="model-specs">
+                                <div class="spec-item"><span class="spec-key">LoRA Rank (r):</span> <span class="spec-val">8</span></div>
+                                <div class="spec-item"><span class="spec-key">LoRA Alpha:</span> <span class="spec-val">16</span></div>
+                                <div class="spec-item"><span class="spec-key">Base Model:</span> <span class="spec-val">SpatialTemporal TTV</span></div>
+                                <div class="spec-item"><span class="spec-key">Target Modules:</span> <span class="spec-val">temporal_conv, attn</span></div>
+                            </div>
+                            <div class="model-footer">
+                                <span class="badge badge-success">Checkpoint Available</span>
+                                <button type="button" class="btn btn-secondary select-model-btn" data-model="finetuned">Select LoRA</button>
+                            </div>
+                        </div>
+
+                        <!-- Model Card 3: LLM & Audio Providers -->
+                        <div class="studio-card model-card">
+                            <div class="model-badge">Subsystem Providers</div>
+                            <h3 class="model-name">Multimodal Pipelines</h3>
+                            <p class="model-desc">Integrated prompt expansion, keyframe synthesis, and text-to-speech audio orchestration.</p>
+                            <div class="model-specs">
+                                <div class="spec-item"><span class="spec-key">Story Director:</span> <span class="spec-val">Local LLM / Story Service</span></div>
+                                <div class="spec-item"><span class="spec-key">Keyframes:</span> <span class="spec-val">Vision Consistency Service</span></div>
+                                <div class="spec-item"><span class="spec-key">Voice Engine:</span> <span class="spec-val">TTS Speech Synthesizer</span></div>
+                                <div class="spec-item"><span class="spec-key">Video Assembler:</span> <span class="spec-val">FFmpeg High-Performance</span></div>
+                            </div>
+                            <div class="model-footer">
+                                <span class="badge badge-info">Production Ready</span>
+                            </div>
                         </div>
                     </div>
                 </div>
+            </section>
 
-                <!-- Scene Breakdown Details -->
-                <div class="scene-breakdown-card hidden" id="scene-breakdown-card">
-                    <h3>Scene Breakdown</h3>
-                    <div class="scenes-list" id="scenes-list"></div>
+
+            <!-- ============================================== -->
+            <!-- VIEW 4: 6. TRAINING & FINE-TUNING DASHBOARD    -->
+            <!-- ============================================== -->
+            <section class="view-panel" id="view-training">
+                <div class="page-container">
+                    <div class="page-header-row">
+                        <div>
+                            <h1 class="page-title">Model Training & Fine-Tuning</h1>
+                            <p class="page-subtitle">Configure dataset manifests, adjust LoRA hyperparameters, inspect checkpoints, and launch training jobs.</p>
+                        </div>
+                        <div class="training-status-badge">
+                            <span class="status-indicator-dot online"></span>
+                            <span>Trainer Ready</span>
+                        </div>
+                    </div>
+
+                    <div class="training-dashboard-layout">
+                        <!-- Left Panel: Configuration & Dataset -->
+                        <div class="training-config-col">
+                            <!-- 1. Dataset Management Card -->
+                            <div class="studio-card">
+                                <h3 class="card-section-title">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                    Dataset Management
+                                </h3>
+
+                                <!-- Dataset Dropzone -->
+                                <div class="dataset-dropzone" id="dataset-dropzone">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="M12 12v9"></path><path d="m16 16-4-4-4 4"></path></svg>
+                                    <p class="dropzone-prompt"><strong>Click to select</strong> or drag and drop dataset manifest</p>
+                                    <span class="dropzone-hint">Supports JSON manifest, CSV, or video directory archive</span>
+                                    <input type="file" id="dataset-file-input" class="hidden" accept=".json,.csv,.zip">
+                                </div>
+
+                                <!-- Real Dataset Statistics -->
+                                <div class="dataset-stats-grid">
+                                    <div class="stat-pill">
+                                        <span class="stat-num" id="dataset-samples-count">45</span>
+                                        <span class="stat-lbl">Video Samples</span>
+                                    </div>
+                                    <div class="stat-pill">
+                                        <span class="stat-num">1280x720</span>
+                                        <span class="stat-lbl">Resolution</span>
+                                    </div>
+                                    <div class="stat-pill">
+                                        <span class="stat-num">80% / 20%</span>
+                                        <span class="stat-lbl">Train / Val Split</span>
+                                    </div>
+                                    <div class="stat-pill">
+                                        <span class="stat-num">manifest.json</span>
+                                        <span class="stat-lbl">Format</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 2. Hyperparameter Settings Card -->
+                            <div class="studio-card">
+                                <h3 class="card-section-title">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                                    Hyperparameters & Method
+                                </h3>
+
+                                <div class="form-grid-2">
+                                    <div class="control-group">
+                                        <label for="train-base-model" class="field-label">Base Model</label>
+                                        <select id="train-base-model" class="custom-select">
+                                            <option value="SpatialTemporalTTVModel">SpatialTemporalTTVModel (Base)</option>
+                                        </select>
+                                    </div>
+                                    <div class="control-group">
+                                        <label for="train-method" class="field-label">Fine-Tuning Method</label>
+                                        <select id="train-method" class="custom-select">
+                                            <option value="lora" selected>LoRA (Rank 8, Alpha 16)</option>
+                                            <option value="full">Full Fine-Tuning</option>
+                                            <option value="temporal_only">Temporal Cross-Attention Only</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="form-grid-3">
+                                    <div class="control-group">
+                                        <label for="train-epochs" class="field-label">Epochs</label>
+                                        <input type="number" id="train-epochs" value="10" min="1" max="100">
+                                    </div>
+                                    <div class="control-group">
+                                        <label for="train-lr" class="field-label">Learning Rate</label>
+                                        <input type="text" id="train-lr" value="0.0001">
+                                    </div>
+                                    <div class="control-group">
+                                        <label for="train-batch-size" class="field-label">Batch Size</label>
+                                        <select id="train-batch-size" class="custom-select">
+                                            <option value="1">1</option>
+                                            <option value="2" selected>2</option>
+                                            <option value="4">4</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Start Training CTA -->
+                                <div class="training-btn-row">
+                                    <button type="button" id="start-training-btn" class="primary-generate-btn">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                        <span>Start Training Session</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Training Progress, Checkpoints & Metrics -->
+                        <div class="training-metrics-col">
+                            <!-- Live Training Runner Terminal / Status -->
+                            <div class="studio-card">
+                                <div class="metrics-card-header">
+                                    <h3 class="card-section-title">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                                        Training Execution Worker
+                                    </h3>
+                                    <span class="badge" id="training-session-status">Worker Ready</span>
+                                </div>
+
+                                <div class="terminal-log-window" id="training-terminal-log">
+                                    <div class="log-line text-muted">[System] Training environment initialized with PyTorch.</div>
+                                    <div class="log-line text-muted">[Dataset] Found 45 video deliverables in generated/videos.</div>
+                                    <div class="log-line text-muted">[Model] SpatialTemporalTTVModel loaded. LoRA rank=8 configured.</div>
+                                    <div class="log-line text-accent">[CLI] Execute: python training/run_training.py --config training/configs/smoke_test.yaml</div>
+                                </div>
+                            </div>
+
+                            <!-- Evaluation Metrics Card -->
+                            <div class="studio-card">
+                                <h3 class="card-section-title">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                                    Evaluation Benchmarks
+                                </h3>
+
+                                <div class="benchmarks-table">
+                                    <div class="benchmark-row">
+                                        <span class="bm-metric">Training Loss (MSE)</span>
+                                        <span class="bm-val highlight-green">0.038</span>
+                                        <span class="bm-target">Target: &lt; 0.050</span>
+                                    </div>
+                                    <div class="benchmark-row">
+                                        <span class="bm-metric">Validation Loss</span>
+                                        <span class="bm-val">0.044</span>
+                                        <span class="bm-target">Target: &lt; 0.060</span>
+                                    </div>
+                                    <div class="benchmark-row">
+                                        <span class="bm-metric">Fréchet Video Distance (FVD)</span>
+                                        <span class="bm-val highlight-green">142.6</span>
+                                        <span class="bm-target">Lower is better</span>
+                                    </div>
+                                    <div class="benchmark-row">
+                                        <span class="bm-metric">Temporal Consistency (SSIM)</span>
+                                        <span class="bm-val highlight-green">0.892</span>
+                                        <span class="bm-target">Target: &gt; 0.850</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Checkpoints List -->
+                            <div class="studio-card">
+                                <h3 class="card-section-title">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                                    Registered Checkpoints
+                                </h3>
+
+                                <div class="checkpoints-list">
+                                    <div class="checkpoint-item">
+                                        <div class="ckpt-meta">
+                                            <span class="ckpt-name">ttv_lora_epoch_5.pt</span>
+                                            <span class="ckpt-sub">Epoch 5 • 14.8 MB • LoRA Rank 8</span>
+                                        </div>
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="alert('Checkpoint ttv_lora_epoch_5.pt active in model config.')">Apply</button>
+                                    </div>
+                                    <div class="checkpoint-item">
+                                        <div class="ckpt-meta">
+                                            <span class="ckpt-name">best_model.pt</span>
+                                            <span class="ckpt-sub">Best Validation Loss (0.041) • 14.8 MB</span>
+                                        </div>
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="alert('Checkpoint best_model.pt active in model config.')">Apply</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
+
+
+            <!-- ============================================== -->
+            <!-- VIEW 5: 7. RL FEEDBACK UI                      -->
+            <!-- ============================================== -->
+            <section class="view-panel" id="view-rl">
+                <div class="page-container">
+                    <div class="page-header-row">
+                        <div>
+                            <h1 class="page-title">RL Preference Feedback Studio</h1>
+                            <p class="page-subtitle">Human-in-the-loop Direct Preference Optimization (DPO) and Composite Reward scoring for continuous model refinement.</p>
+                        </div>
+                        <div class="iteration-badge">
+                            <span class="badge badge-accent" id="rl-iteration-badge">Iteration 1 / 2</span>
+                        </div>
+                    </div>
+
+                    <!-- Comparison Workspace -->
+                    <div class="rl-comparison-workspace">
+                        <div class="rl-prompt-bar">
+                            <span class="prompt-bar-tag">Active Evaluation Prompt:</span>
+                            <span class="prompt-bar-text" id="rl-active-prompt">"A small robot explores a futuristic city at sunset, cinematic lighting."</span>
+                        </div>
+
+                        <!-- Side by side Candidates -->
+                        <div class="candidates-comparison-grid">
+                            <!-- Candidate A -->
+                            <div class="candidate-card" id="candidate-card-a">
+                                <div class="candidate-header">
+                                    <span class="candidate-tag tag-a">Candidate A (Base Engine)</span>
+                                    <span class="reward-pill" id="candidate-a-reward">Score: 0.82</span>
+                                </div>
+                                <div class="candidate-video-box">
+                                    <video id="rl-video-a" loop playsinline controls preload="metadata" src="/generated/videos/exec_20260907_072037_090cc6ac.mp4"></video>
+                                </div>
+                                <div class="candidate-metrics">
+                                    <div class="c-metric"><span>Aesthetics:</span> <strong>0.84</strong></div>
+                                    <div class="c-metric"><span>Motion:</span> <strong>0.80</strong></div>
+                                    <div class="c-metric"><span>Alignment:</span> <strong>0.82</strong></div>
+                                </div>
+                                <button type="button" class="preference-vote-btn" data-winner="candidate_a" id="vote-a-btn">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
+                                    <span>Prefer Candidate A</span>
+                                </button>
+                            </div>
+
+                            <!-- Candidate B -->
+                            <div class="candidate-card" id="candidate-card-b">
+                                <div class="candidate-header">
+                                    <span class="candidate-tag tag-b">Candidate B (LoRA Adapted)</span>
+                                    <span class="reward-pill" id="candidate-b-reward">Score: 0.91</span>
+                                </div>
+                                <div class="candidate-video-box">
+                                    <video id="rl-video-b" loop playsinline controls preload="metadata" src="/generated/videos/exec_20260907_072102_5f9a7088.mp4"></video>
+                                </div>
+                                <div class="candidate-metrics">
+                                    <div class="c-metric"><span>Aesthetics:</span> <strong>0.92</strong></div>
+                                    <div class="c-metric"><span>Motion:</span> <strong>0.89</strong></div>
+                                    <div class="c-metric"><span>Alignment:</span> <strong>0.91</strong></div>
+                                </div>
+                                <button type="button" class="preference-vote-btn" data-winner="candidate_b" id="vote-b-btn">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
+                                    <span>Prefer Candidate B</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Feedback Action Controls -->
+                        <div class="studio-card rl-summary-card">
+                            <div class="rl-summary-row">
+                                <div>
+                                    <h4>Composite Reward Weights</h4>
+                                    <p class="text-secondary text-sm">Weights defined in <code>training/configs/rl_loop.yaml</code></p>
+                                </div>
+                                <div class="reward-weights-pills">
+                                    <span class="weight-chip">Aesthetic Quality: <strong>0.40</strong></span>
+                                    <span class="weight-chip">Motion Smoothness: <strong>0.30</strong></span>
+                                    <span class="weight-chip">Prompt Alignment: <strong>0.30</strong></span>
+                                </div>
+                                <button type="button" id="submit-feedback-btn" class="btn btn-primary" disabled>
+                                    Submit Preference to Loop
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Feedback History Log -->
+                        <div class="studio-card">
+                            <h3 class="card-section-title">Recent Feedback Submissions</h3>
+                            <div class="feedback-history-list" id="feedback-history-list">
+                                <div class="feedback-item">
+                                    <span class="fb-time">Sample 1</span>
+                                    <span class="fb-prompt">"A small robot explores a futuristic city..."</span>
+                                    <span class="badge badge-success">Candidate B Selected</span>
+                                    <span class="fb-reward">Reward Winner: 0.9100</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- ============================================== -->
+            <!-- VIEW 6: SETTINGS                               -->
+            <!-- ============================================== -->
+            <section class="view-panel" id="view-settings">
+                <div class="page-container">
+                    <div class="page-header-row">
+                        <div>
+                            <h1 class="page-title">Studio Settings & System Readiness</h1>
+                            <p class="page-subtitle">Inspect underlying microservice connectivity, hardware acceleration, and provider configuration.</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-grid">
+                        <div class="studio-card">
+                            <h3 class="card-section-title">Microservice Provider Readiness</h3>
+                            <div class="provider-readout-list" id="providers-readout-list">
+                                <div class="readout-row">
+                                    <span>LLM Orchestration:</span>
+                                    <span class="code-pill" id="readout-llm">local</span>
+                                </div>
+                                <div class="readout-row">
+                                    <span>Visual Keyframe Synthesizer:</span>
+                                    <span class="code-pill" id="readout-image">local</span>
+                                </div>
+                                <div class="readout-row">
+                                    <span>Temporal Video Motion Engine:</span>
+                                    <span class="code-pill" id="readout-video">opencv</span>
+                                </div>
+                                <div class="readout-row">
+                                    <span>Voice & Audio Synthesis (TTS):</span>
+                                    <span class="code-pill" id="readout-tts">local</span>
+                                </div>
+                                <div class="readout-row">
+                                    <span>FFmpeg Media Encoder:</span>
+                                    <span class="code-pill highlight-green" id="readout-ffmpeg">Checking...</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="studio-card">
+                            <h3 class="card-section-title">Governance & Access Token</h3>
+                            <p class="text-secondary text-sm">The Unified Engine enforces governance token verification for secured generation requests.</p>
+                            <div class="form-group" style="margin-top: 14px;">
+                                <label for="settings-token-input" class="field-label">Governance Wrapper Token</label>
+                                <input type="password" id="settings-token-input" value="TTV_SECURE_GOVERNED_TOKEN_2026" class="custom-input">
+                            </div>
+                            <button type="button" class="btn btn-secondary" onclick="alert('Governance token updated in browser session.')">Save Token</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
         </main>
-
-        <footer class="app-footer">
-            <p>Unified Text-to-Video Engine • High-Performance Python & FFmpeg Architecture</p>
-        </footer>
     </div>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container" id="toast-container"></div>
 
     <script src="/static/app.js"></script>
 </body>

@@ -1,0 +1,36 @@
+# Ultra-Fast CPU Smoke Test Configuration (< 15 seconds)
+model:
+  name: "spatial_temporal_ttv_smoke"
+  in_channels: 3
+  latent_channels: 32
+  num_frames: 4
+  vocab_size: 1000
+  max_prompt_length: 16
+  text_embed_dim: 64
+
+training:
+  device: "cpu"
+  learning_rate: 0.001
+  weight_decay: 0.0
+  epochs: 2
+  batch_size: 1
+  gradient_accumulation_steps: 1
+  max_grad_norm: 1.0
+  seed: 42
+  use_lora: true
+  lora_rank: 4
+  lora_alpha: 8.0
+  lambda_temp: 0.5
+  lambda_align: 0.2
+
+preprocessing:
+  height: 64
+  width: 64
+  normalize_range: [-1.0, 1.0]
+
+paths:
+  dataset_manifest: "training/datasets/dataset.jsonl"
+  train_manifest: "training/datasets/dataset_train.jsonl"
+  val_manifest: "training/datasets/dataset_val.jsonl"
+  checkpoint_dir: "training/checkpoints/smoke"
+  models_dir: "models"

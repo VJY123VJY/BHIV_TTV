@@ -1,0 +1,14 @@
+{
+  "version": "ttv_lora_v001",
+  "model_type": "lora",
+  "base_model": "spatial_temporal_ttv_v1",
+  "dataset_version": "dataset_v1",
+  "checkpoint_path": "C:\\Users\\vijay\\AppData\\Local\\Temp\\tmptqrv6e3p\\ttv_lora_v001.pt",
+  "weights_sha256": "41aba32ebc2b7d0b7148006610bc099b5dd4fb922dcec369dcabeaf9ef42c5e5",
+  "registered_at": "2026-09-07T10:07:44.360011Z",
+  "training_config": {},
+  "metrics": {
+    "winner_reward": 0.6969,
+    "loser_reward": 0.6824
+  }
+}

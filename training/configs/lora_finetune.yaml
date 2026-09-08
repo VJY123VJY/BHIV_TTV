@@ -1,0 +1,36 @@
+# LoRA Parameter-Efficient Fine-Tuning Configuration
+model:
+  name: "spatial_temporal_ttv_v1"
+  in_channels: 3
+  latent_channels: 64
+  num_frames: 8
+  vocab_size: 10000
+  max_prompt_length: 32
+  text_embed_dim: 128
+
+training:
+  device: "cpu"
+  learning_rate: 0.0002
+  weight_decay: 0.01
+  epochs: 8
+  batch_size: 2
+  gradient_accumulation_steps: 2
+  max_grad_norm: 1.0
+  seed: 42
+  use_lora: true
+  lora_rank: 4
+  lora_alpha: 8.0
+  lambda_temp: 0.5
+  lambda_align: 0.2
+
+preprocessing:
+  height: 128
+  width: 128
+  normalize_range: [-1.0, 1.0]
+
+paths:
+  dataset_manifest: "training/datasets/dataset.jsonl"
+  train_manifest: "training/datasets/dataset_train.jsonl"
+  val_manifest: "training/datasets/dataset_val.jsonl"
+  checkpoint_dir: "training/checkpoints/lora"
+  models_dir: "models"

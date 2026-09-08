@@ -9,6 +9,7 @@ class GenerationRequest(BaseModel):
     resolution: Optional[str] = Field(default="1280x720", description="Target video resolution (e.g. 1280x720, 1920x1080)")
     fps: Optional[int] = Field(default=24, ge=15, le=60, description="Frames per second")
     token: Optional[str] = Field(default=None, description="Optional governance authorization token")
+    model_mode: Optional[str] = Field(default="base", description="Generation engine mode: base or finetuned")
 
     model_config = {
         "json_schema_extra": {
