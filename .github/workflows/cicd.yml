@@ -24,6 +24,7 @@ jobs:
       - name: Create stub .env for compose validation
         run: |
           touch .env
+          touch frontend.env
 
       - name: Validate Docker Compose files
         run: |
@@ -66,6 +67,13 @@ jobs:
             --tag bhiv/ttv-service:latest \
             -f Dockerfile .
 
+      - name: Build and push bhiv/ttv-frontend image
+        run: |
+          docker buildx build --push \
+            --tag bhiv/ttv-frontend:${{ steps.vars.outputs.sha_short }} \
+            --tag bhiv/ttv-frontend:latest \
+            -f frontend/Dockerfile frontend
+
   deploy:
     name: Deploy to remote production VM via SSH
     needs: build
@@ -82,9 +90,22 @@ jobs:
           ${{ secrets.TTV_BACKEND_ENV || secrets.BACKEND_ENV_FILE || secrets.TTV_ENV_FILE }}
           EOF
 
+      - name: Create frontend env file from secrets
+        run: |
+          cat <<'EOF' > frontend.env
+          ${{ secrets.TTV_FRONTEND_ENV || secrets.FRONTEND_ENV_FILE || '' }}
+          EOF
+          sed -i 's/^[[:space:]]*//' frontend.env || true
+          if [ ! -s frontend.env ]; then
+            cat <<'EOF' > frontend.env
+          VIDEO_PROVIDER=wan
+          VIDEO_PROVIDER=opencv
+          EOF
+          fi
+
       - name: Tar deployment files
         run: |
-          tar -czf deployment.tar.gz docker-compose.production.template.yml .env
+          tar -czf deployment.tar.gz docker-compose.production.template.yml .env frontend.env
 
       - name: Install sshpass
         run: |
@@ -161,9 +182,18 @@ jobs:
               # HTTP endpoint check on host port 8019
               HTTP_HEALTH=0
               curl -sf http://localhost:8019/health > /dev/null && HTTP_HEALTH=1
+
+              # Frontend container health check status
+              FRONTEND_HEALTH=0
+              FRONTEND_STATUS=$(docker inspect --format='{{.State.Health.Status}}' ttv_frontend_prod 2>/dev/null || echo "missing")
+              [ "$FRONTEND_STATUS" = "healthy" ] && FRONTEND_HEALTH=1
+
+              # Frontend HTTP check on host port 8021
+              FRONTEND_HTTP_HEALTH=0
+              curl -sf http://localhost:8021/ > /dev/null && FRONTEND_HTTP_HEALTH=1
               
-              if [ "$UNHEALTHY_COUNT" -eq 0 ] && [ "$STARTING_COUNT" -eq 0 ] && [ "$TTV_HEALTH" -eq 1 ] && [ "$HTTP_HEALTH" -eq 1 ]; then
-                echo "BHIV TTV container and healthcheck endpoint are healthy!"
+              if [ "$UNHEALTHY_COUNT" -eq 0 ] && [ "$STARTING_COUNT" -eq 0 ] && [ "$TTV_HEALTH" -eq 1 ] && [ "$HTTP_HEALTH" -eq 1 ] && [ "$FRONTEND_HEALTH" -eq 1 ] && [ "$FRONTEND_HTTP_HEALTH" -eq 1 ]; then
+                echo "BHIV TTV backend and frontend services are healthy!"
                 break
               fi
               
@@ -270,8 +300,15 @@ jobs:
                 
                 HTTP_HEALTH=0
                 curl -sf http://localhost:8019/health > /dev/null && HTTP_HEALTH=1
+
+                FRONTEND_HEALTH=0
+                FRONTEND_STATUS=$(docker inspect --format='{{.State.Health.Status}}' ttv_frontend_prod 2>/dev/null || echo "missing")
+                [ "$FRONTEND_STATUS" = "healthy" ] && FRONTEND_HEALTH=1
+
+                FRONTEND_HTTP_HEALTH=0
+                curl -sf http://localhost:8021/ > /dev/null && FRONTEND_HTTP_HEALTH=1
                 
-                if [ "$UNHEALTHY_COUNT" -eq 0 ] && [ "$STARTING_COUNT" -eq 0 ] && [ "$TTV_HEALTH" -eq 1 ] && [ "$HTTP_HEALTH" -eq 1 ]; then
+                if [ "$UNHEALTHY_COUNT" -eq 0 ] && [ "$STARTING_COUNT" -eq 0 ] && [ "$TTV_HEALTH" -eq 1 ] && [ "$HTTP_HEALTH" -eq 1 ] && [ "$FRONTEND_HEALTH" -eq 1 ] && [ "$FRONTEND_HTTP_HEALTH" -eq 1 ]; then
                   echo "Rollback deployment is healthy!"
                   echo "| $(date -u +'%Y-%m-%d %H:%M:%S UTC') | $LAST_HEALTHY_TAG | ROLLBACK_SUCCESS | Rollback from failed ${{ needs.build.outputs.sha_short }} is healthy |" >> docs/RELEASE_HISTORY.md
                   exit 0

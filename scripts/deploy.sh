@@ -29,6 +29,16 @@ if [ ! -f ".env" ]; then
     fi
 fi
 
+# Check for frontend.env file
+if [ ! -f "frontend.env" ]; then
+    if [ -f "frontend.env.example" ]; then
+        echo "⚠️ frontend.env not found. Creating frontend.env from frontend.env.example..."
+        cp frontend.env.example frontend.env
+    else
+        echo "VIDEO_PROVIDER=opencv" > frontend.env
+    fi
+fi
+
 # Ensure persistent directories exist
 mkdir -p generated/videos generated/temp generated/images generated/scenes generated/audio
 
@@ -40,8 +50,9 @@ echo "🔍 Validating service health..."
 bash "${SCRIPT_DIR}/healthcheck.sh"
 
 echo "====================================================="
-echo "✅ BHIV TTV service deployed successfully!"
-echo "   Web UI: http://localhost:8000/"
-echo "   API Health: http://localhost:8000/health"
-echo "   API Documentation: http://localhost:8000/docs"
+echo "✅ BHIV TTV services deployed successfully!"
+echo "   Web UI (Frontend):  http://localhost:8021/"
+echo "   API Health (Backend): http://localhost:8019/health"
+echo "   API Documentation:   http://localhost:8019/docs"
 echo "====================================================="
+
