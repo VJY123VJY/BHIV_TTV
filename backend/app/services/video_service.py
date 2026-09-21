@@ -11,7 +11,14 @@ class VideoService:
     def video_adapter(self):
         return get_video_adapter(settings.VIDEO_PROVIDER)
 
-    async def generate_scene_videos(self, scenes: List[Scene], execution_id: str, fps: int = 24) -> List[Scene]:
+    async def generate_scene_videos(
+        self,
+        scenes: List[Scene],
+        execution_id: str,
+        fps: int = 24,
+        width: int = 1280,
+        height: int = 720,
+    ) -> List[Scene]:
         scenes_dir = settings.get_absolute_path(settings.SCENES_DIR)
         os.makedirs(scenes_dir, exist_ok=True)
 
@@ -22,11 +29,6 @@ class VideoService:
             filename = f"{execution_id}_scene_{scene.index}_clip.mp4"
             clip_path = str(scenes_dir / filename)
 
-            # Parse resolution
-            res_parts = settings.DEFAULT_RESOLUTION.lower().split("x")
-            width = int(res_parts[0]) if len(res_parts) == 2 else 1280
-            height = int(res_parts[1]) if len(res_parts) == 2 else 720
-
             await self.video_adapter.generate_scene_video(
                 scene=scene,
                 keyframe_path=scene.image_path,
@@ -36,6 +38,7 @@ class VideoService:
                 fps=fps
             )
             scene.video_path = clip_path
+            scene.metadata["output_size"] = f"{width}x{height}"
 
         return scenes
 

@@ -6,7 +6,9 @@ import subprocess
 from typing import Optional
 from app.adapters.base import BaseTTSAdapter
 from app.core.config import settings
+from app.core.exceptions import AudioGenerationError
 from app.core.logging import telemetry
+from app.utils.languages import get_language_config, resolve_voice
 
 class LocalTTSAdapter(BaseTTSAdapter):
     """
@@ -15,11 +17,20 @@ class LocalTTSAdapter(BaseTTSAdapter):
     Tier 2: gTTS (Google Translate TTS)
     Tier 3: Formant Speech Synthesizer (Built-in wave audio generator for 100% offline autonomy)
     """
-    async def synthesize_speech(self, text: str, output_path: str, voice: Optional[str] = None) -> str:
+    async def synthesize_speech(
+        self,
+        text: str,
+        output_path: str,
+        voice: Optional[str] = None,
+        language: Optional[str] = None,
+    ) -> str:
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        selected_voice = voice or settings.DEFAULT_VOICE
+        lang_cfg = get_language_config(language or "en")
+        lang_code = lang_cfg["code"]
+        selected_voice = resolve_voice(lang_code, voice)
 
-        # Tier 1: Try edge-tts
+        # Tier 1: Try edge-tts with a language-appropriate neural voice
+        last_error = None
         try:
             import edge_tts
             communicate = edge_tts.Communicate(text, selected_voice)
@@ -27,20 +38,29 @@ class LocalTTSAdapter(BaseTTSAdapter):
             if os.path.exists(output_path) and os.path.getsize(output_path) > 500:
                 return output_path
         except Exception as e:
-            telemetry.emit("edgetts_failed", "tts", {"error": str(e)}, level="warning")
+            last_error = e
+            telemetry.emit("edgetts_failed", "tts", {"error": str(e), "language": lang_code, "voice": selected_voice}, level="warning")
 
-        # Tier 2: Try gTTS
+        # Tier 2: Try gTTS in the requested language (never silently use English)
         try:
             from gtts import gTTS
-            tts = gTTS(text=text, lang="en")
+            tts = gTTS(text=text, lang=lang_cfg["gtts"])
             tts.save(output_path)
             if os.path.exists(output_path) and os.path.getsize(output_path) > 500:
                 return output_path
         except Exception as e:
-            telemetry.emit("gtts_failed", "tts", {"error": str(e)}, level="warning")
+            last_error = e
+            telemetry.emit("gtts_failed", "tts", {"error": str(e), "language": lang_code}, level="warning")
 
-        # Tier 3: Built-in Formant Audio Wave Generator
-        telemetry.emit("tts_offline_synthesis", "tts", {"reason": "cloud_tts_unavailable"})
+        if lang_code != "en":
+            raise AudioGenerationError(
+                f"Could not generate {lang_cfg['name']} speech. "
+                "Edge TTS and gTTS both failed for this language. "
+                "Check network access or choose a supported voice."
+            )
+
+        # English-only offline formant fallback so local tests still produce audio.
+        telemetry.emit("tts_offline_synthesis", "tts", {"reason": "cloud_tts_unavailable", "language": lang_code})
         return self._generate_formant_speech_wav(text, output_path)
 
     def _generate_formant_speech_wav(self, text: str, output_path: str) -> str:

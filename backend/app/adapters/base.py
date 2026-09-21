@@ -22,7 +22,13 @@ class BaseLLMAdapter(ABC):
 class BaseVisionConsistencyAdapter(ABC):
     """Abstract interface for character, style, and visual consistency."""
     @abstractmethod
-    def enrich_scene_prompts(self, scenes: List[Scene], global_style: str, character_refs: Optional[Dict[str, Any]] = None) -> List[Scene]:
+    def enrich_scene_prompts(
+        self,
+        scenes: List[Scene],
+        global_style: str,
+        character_refs: Optional[Dict[str, Any]] = None,
+        aspect_ratio: str = "16:9",
+    ) -> List[Scene]:
         """Enrich scenes with coherent style tags, lighting, and character anchors."""
         pass
 
@@ -43,6 +49,12 @@ class BaseVideoAdapter(ABC):
 class BaseTTSAdapter(ABC):
     """Abstract interface for voice and speech generation."""
     @abstractmethod
-    async def synthesize_speech(self, text: str, output_path: str, voice: Optional[str] = None) -> str:
+    async def synthesize_speech(
+        self,
+        text: str,
+        output_path: str,
+        voice: Optional[str] = None,
+        language: Optional[str] = None,
+    ) -> str:
         """Synthesize voice narration saved to output_path."""
         pass

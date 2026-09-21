@@ -17,6 +17,30 @@ document.addEventListener("DOMContentLoaded", () => {
     let activeVideoData = null;
     let selectedRLWinner = null;
     let rlIteration = 1;
+    let selectedAspect = "16:9";
+    let selectedQuality = "standard";
+    let referenceId = null;
+    let referenceType = null;
+    const RESOLUTION_MATRIX = {
+        "16:9": { standard: "1280x720", high: "1920x1080", ultra: "3840x2160" },
+        "9:16": { standard: "720x1280", high: "1080x1920", ultra: "2160x3840" }
+    };
+    const LANGUAGE_VOICES = {
+        en: ["en-US-GuyNeural", "en-US-AriaNeural", "en-IN-NeerjaNeural"],
+        hi: ["hi-IN-MadhurNeural", "hi-IN-SwaraNeural"],
+        mr: ["mr-IN-ManoharNeural", "mr-IN-AarohiNeural"],
+        ta: ["ta-IN-ValluvarNeural", "ta-IN-PallaviNeural"],
+        te: ["te-IN-MohanNeural", "te-IN-ShrutiNeural"],
+        kn: ["kn-IN-GaganNeural", "kn-IN-SapnaNeural"],
+        bn: ["bn-IN-BashkarNeural", "bn-IN-TanishaaNeural"],
+        gu: ["gu-IN-NiranjanNeural", "gu-IN-DhwaniNeural"],
+        pa: ["pa-IN-OjasNeural", "pa-IN-VaaniNeural"],
+        ml: ["ml-IN-MidhunNeural", "ml-IN-SobhanaNeural"],
+        ur: ["ur-IN-SalmanNeural", "ur-IN-GulNeural"],
+        fr: ["fr-FR-HenriNeural", "fr-FR-DeniseNeural"],
+        es: ["es-ES-AlvaroNeural", "es-ES-ElviraNeural"],
+        de: ["de-DE-ConradNeural", "de-DE-KatjaNeural"]
+    };
 
     // Seed project history if empty
     const DEFAULT_PROJECT_HISTORY = [
@@ -118,14 +142,29 @@ document.addEventListener("DOMContentLoaded", () => {
     const durationSlider = document.getElementById("duration-slider");
     const durationValBadge = document.getElementById("duration-val-badge");
     const aspectBtns = document.querySelectorAll(".aspect-btn");
-    const resolutionSelect = document.getElementById("resolution-select");
+    const qualityBtns = document.querySelectorAll(".quality-btn");
+    const outputReadout = document.getElementById("output-readout");
     const styleSelect = document.getElementById("style-select");
+    const languageSelect = document.getElementById("language-select");
+    const voiceSelect = document.getElementById("voice-select");
+    const characterSelect = document.getElementById("character-select");
+    const subtitlesToggle = document.getElementById("subtitles-toggle");
+    const musicToggle = document.getElementById("music-toggle");
+    const realtimeToggle = document.getElementById("realtime-toggle");
     const seedInput = document.getElementById("seed-input");
     const randomizeSeedBtn = document.getElementById("randomize-seed-btn");
     const fpsSelect = document.getElementById("fps-select");
     const voiceToggle = document.getElementById("voice-toggle");
+    const lipsyncToggle = document.getElementById("lipsync-toggle");
     const generateBtn = document.getElementById("generate-btn");
     const presetChips = document.querySelectorAll(".preset-chip");
+    const uploadImageBtn = document.getElementById("upload-image-btn");
+    const uploadVideoBtn = document.getElementById("upload-video-btn");
+    const pasteLinkBtn = document.getElementById("paste-link-btn");
+    const referenceImageInput = document.getElementById("reference-image-input");
+    const referenceVideoInput = document.getElementById("reference-video-input");
+    const referenceUrlInput = document.getElementById("reference-url-input");
+    const referenceStatus = document.getElementById("reference-status");
 
     // Progress Card & 4 Stepper Steps
     const progressCard = document.getElementById("progress-card");
@@ -302,30 +341,106 @@ document.addEventListener("DOMContentLoaded", () => {
         durationValBadge.textContent = `${e.target.value} seconds`;
     });
 
+    function currentResolution() {
+        return RESOLUTION_MATRIX[selectedAspect][selectedQuality];
+    }
+
+    function updateOutputReadout() {
+        const res = currentResolution().replace("x", " × ");
+        if (outputReadout) outputReadout.textContent = `Output: ${res}`;
+    }
+
+    function populateVoices() {
+        if (!voiceSelect || !languageSelect) return;
+        const lang = languageSelect.value;
+        const voices = LANGUAGE_VOICES[lang] || LANGUAGE_VOICES.en;
+        voiceSelect.innerHTML = "";
+        voices.forEach((voice, idx) => {
+            const opt = new Option(voice, voice, idx === 0, idx === 0);
+            voiceSelect.add(opt);
+        });
+    }
+
     aspectBtns.forEach(btn => {
         btn.addEventListener("click", () => {
             aspectBtns.forEach(b => b.classList.remove("active"));
             btn.classList.add("active");
-
-            // Sync with resolution dropdown if available
-            const res = btn.dataset.res;
-            if (resolutionSelect) {
-                // If the resolution select has this option, select it; otherwise add or match
-                let exists = false;
-                for (let i = 0; i < resolutionSelect.options.length; i++) {
-                    if (resolutionSelect.options[i].value === res) {
-                        resolutionSelect.selectedIndex = i;
-                        exists = true;
-                        break;
-                    }
-                }
-                if (!exists) {
-                    const newOpt = new Option(`${res} (${btn.dataset.aspect})`, res, true, true);
-                    resolutionSelect.add(newOpt);
-                }
-            }
+            selectedAspect = btn.dataset.aspect;
+            updateOutputReadout();
         });
     });
+
+    qualityBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            qualityBtns.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            selectedQuality = btn.dataset.quality;
+            updateOutputReadout();
+        });
+    });
+
+    if (languageSelect) {
+        languageSelect.addEventListener("change", populateVoices);
+        populateVoices();
+    }
+    updateOutputReadout();
+
+    function setReferenceStatus(text) {
+        if (referenceStatus) referenceStatus.textContent = text;
+    }
+
+    async function uploadReferenceFile(file, hintedType) {
+        const form = new FormData();
+        form.append("file", file);
+        if (hintedType) form.append("reference_type", hintedType);
+        const res = await fetch("/api/v1/references/upload", { method: "POST", body: form });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.message || errData.detail || "Reference upload failed");
+        }
+        const data = await res.json();
+        referenceId = data.reference_id;
+        referenceType = data.media_type;
+        if (referenceUrlInput) referenceUrlInput.value = "";
+        setReferenceStatus(`Uploaded ${data.media_type}: ${file.name}`);
+        showToast("Reference uploaded.");
+    }
+
+    if (uploadImageBtn) uploadImageBtn.addEventListener("click", () => referenceImageInput && referenceImageInput.click());
+    if (uploadVideoBtn) uploadVideoBtn.addEventListener("click", () => referenceVideoInput && referenceVideoInput.click());
+    if (pasteLinkBtn && referenceUrlInput) {
+        pasteLinkBtn.addEventListener("click", () => {
+            referenceUrlInput.classList.toggle("hidden");
+            referenceUrlInput.focus();
+        });
+    }
+    if (referenceImageInput) {
+        referenceImageInput.addEventListener("change", async () => {
+            const file = referenceImageInput.files && referenceImageInput.files[0];
+            if (!file) return;
+            try { await uploadReferenceFile(file, "image"); }
+            catch (err) { showToast(err.message, "error"); }
+        });
+    }
+    if (referenceVideoInput) {
+        referenceVideoInput.addEventListener("change", async () => {
+            const file = referenceVideoInput.files && referenceVideoInput.files[0];
+            if (!file) return;
+            try { await uploadReferenceFile(file, "video"); }
+            catch (err) { showToast(err.message, "error"); }
+        });
+    }
+    if (referenceUrlInput) {
+        referenceUrlInput.addEventListener("input", () => {
+            if (referenceUrlInput.value.trim()) {
+                referenceId = null;
+                referenceType = null;
+                setReferenceStatus("Reference URL ready");
+            } else if (!referenceId) {
+                setReferenceStatus("No reference selected");
+            }
+        });
+    }
 
     randomizeSeedBtn.addEventListener("click", () => {
         const randomSeed = Math.floor(Math.random() * 1000000);
@@ -383,8 +498,30 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // Call health on initial load
+    async function loadGenerationOptions() {
+        try {
+            const res = await fetch("/api/v1/generation-options");
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.resolution_matrix) {
+                Object.keys(data.resolution_matrix).forEach((aspect) => {
+                    RESOLUTION_MATRIX[aspect] = data.resolution_matrix[aspect];
+                });
+                updateOutputReadout();
+            }
+            if (Array.isArray(data.languages)) {
+                data.languages.forEach((lang) => {
+                    LANGUAGE_VOICES[lang.id] = lang.voices;
+                });
+                populateVoices();
+            }
+        } catch (e) {
+            // Keep built-in catalog when the API is offline.
+        }
+    }
+
     fetchSystemHealth();
+    loadGenerationOptions();
 
     // =========================================================================
     // 8. GENERATION WORKFLOW & STAGE TRACKER (5 REQUIRED STAGES)
@@ -436,20 +573,33 @@ document.addEventListener("DOMContentLoaded", () => {
         const duration = parseInt(durationSlider.value, 10);
         const style = styleSelect.value;
         const voice = voiceToggle.checked;
-        const resolution = resolutionSelect.value;
         const fps = parseInt(fpsSelect.value, 10);
         const modelMode = modelSelect.value;
         const token = (settingsTokenInput ? settingsTokenInput.value.trim() : null) || null;
+        const language = languageSelect ? languageSelect.value : "en";
+        const voiceId = voiceSelect ? voiceSelect.value : null;
+        const referenceUrl = referenceUrlInput ? referenceUrlInput.value.trim() : "";
 
         const payload = {
             prompt,
             duration,
             style,
             voice,
-            resolution,
             fps,
             model_mode: modelMode,
-            token
+            token,
+            aspect_ratio: selectedAspect,
+            quality: selectedQuality,
+            language,
+            voice_id: voice ? voiceId : null,
+            character_id: characterSelect ? characterSelect.value || null : null,
+            subtitles: !!(subtitlesToggle && subtitlesToggle.checked),
+            music: !!(musicToggle && musicToggle.checked),
+            realtime_data: !!(realtimeToggle && realtimeToggle.checked),
+            lipsync: !!(lipsyncToggle && lipsyncToggle.checked),
+            reference_url: referenceUrl || null,
+            reference_type: referenceType,
+            reference_id: referenceId
         };
 
         // UI state change to generating
@@ -481,7 +631,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.message || errData.detail || "Failed to submit generation job");
+                const detail = Array.isArray(errData.detail) ? errData.detail[0]?.msg : errData.detail;
+                throw new Error(errData.message || detail || "Failed to submit generation job");
             }
 
             const data = await res.json();
@@ -528,7 +679,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     stageMainTitle.textContent = "Generating video...";
                     stageSubTitle.textContent = "Generating frames...";
                     setStepState(2);
-                } else if (stage.includes("rendering") || stage.includes("voice") || stage.includes("audio") || stage.includes("assembling") || stage.includes("validating") || stage.includes("storing")) {
+                } else if (stage.includes("rendering") || stage.includes("voice") || stage.includes("lipsync") || stage.includes("audio") || stage.includes("assembling") || stage.includes("validating") || stage.includes("storing")) {
                     stageMainTitle.textContent = "Generating video...";
                     stageSubTitle.textContent = "Creating video...";
                     setStepState(3);
@@ -570,7 +721,7 @@ document.addEventListener("DOMContentLoaded", () => {
             video_id: result.video_id || `gen_${Date.now()}`,
             prompt: result.prompt || payload.prompt,
             duration: result.duration || payload.duration,
-            resolution: result.resolution || payload.resolution,
+            resolution: result.resolution || currentResolution(),
             style: result.style || payload.style,
             model: payload.model_mode || "base",
             video_url: result.video_url,

@@ -9,7 +9,12 @@ class JobManager:
         self._jobs: Dict[str, Dict[str, Any]] = {}
         self._lock = asyncio.Lock()
 
-    async def create_job(self, job_id: str, request_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def create_job(
+        self,
+        job_id: str,
+        request_data: Dict[str, Any],
+        settings: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         async with self._lock:
             job = {
                 "job_id": job_id,
@@ -17,6 +22,7 @@ class JobManager:
                 "progress": 0,
                 "stage": "queued",
                 "request": request_data,
+                "settings": settings,
                 "created_at": datetime.utcnow().isoformat() + "Z",
                 "updated_at": datetime.utcnow().isoformat() + "Z",
                 "result": None,

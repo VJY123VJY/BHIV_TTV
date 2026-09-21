@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     # Optional HuggingFace token for gated/private model access
     HF_TOKEN: Optional[str] = None
 
+    # Semantic adherence needs an explicitly configured VLM evaluator. The
+    # deterministic constraints layer is always available, but does not claim a score.
+    PROMPT_ADHERENCE_PROVIDER: str = "disabled"
+    MAX_VIDEO_RETRIES: int = 2
+
 
     # API Keys
     OPENAI_API_KEY: str = ""
@@ -54,6 +59,7 @@ class Settings(BaseSettings):
     IMAGES_DIR: str = "generated/images"
     SCENES_DIR: str = "generated/scenes"
     AUDIO_DIR: str = "generated/audio"
+    REFERENCES_DIR: str = "generated/references"
     FRONTEND_DIR: str = "frontend"
 
     # Generation Defaults
@@ -63,6 +69,31 @@ class Settings(BaseSettings):
     DEFAULT_RESOLUTION: str = "1280x720"
     DEFAULT_STYLE: str = "cinematic"
     DEFAULT_VOICE: str = "en-US-GuyNeural"
+    DEFAULT_ASPECT_RATIO: str = "16:9"
+    DEFAULT_QUALITY: str = "standard"
+    DEFAULT_LANGUAGE: str = "en"
+
+    # Dataset / training policy.  These flags deliberately keep data acquisition
+    # and model fine-tuning separate from normal generation.
+    DATASET_STORAGE: str = "data"
+    DATASET_MAX_DOWNLOAD_GB: int = 100
+    ENABLE_DATASET_TRAINING: bool = False
+
+    # Real-time facts are opt-in and only considered verified when the configured
+    # provider responds successfully.  No embedded/sample market data is used.
+    ENABLE_REALTIME_DATA: bool = False
+    REALTIME_DATA_URL: Optional[str] = None
+    REALTIME_DATA_TIMEOUT: int = 10
+
+    # Reference retrieval
+    REFERENCE_MAX_BYTES: int = 104857600
+    REFERENCE_DOWNLOAD_TIMEOUT: int = 30
+
+    # Lip-sync
+    LIPSYNC_ENABLED: bool = True
+    LIPSYNC_PROVIDER: str = "viseme"
+    LIPSYNC_MODEL_PATH: Optional[str] = None
+    MUSETALK_CHECKPOINT_PATH: Optional[str] = None
 
     # Audio Defaults
     BACKGROUND_MUSIC_ENABLED: bool = True
@@ -84,7 +115,7 @@ class Settings(BaseSettings):
 
     def ensure_directories(self):
         """Ensure all required asset directories exist."""
-        for path_attr in ["OUTPUT_DIR", "TEMP_DIR", "IMAGES_DIR", "SCENES_DIR", "AUDIO_DIR"]:
+        for path_attr in ["OUTPUT_DIR", "TEMP_DIR", "IMAGES_DIR", "SCENES_DIR", "AUDIO_DIR", "REFERENCES_DIR"]:
             p = self.get_absolute_path(getattr(self, path_attr))
             p.mkdir(parents=True, exist_ok=True)
 

@@ -15,7 +15,16 @@ class FFmpegService:
     - Generates and embeds synchronized subtitle streams
     - Enforces web-standard H.264 (yuv420p) + AAC encoding with faststart
     """
-    def assemble_final_video(self, scenes: List[Scene], master_audio_path: str, output_path: str, execution_id: str) -> str:
+    def assemble_final_video(
+        self,
+        scenes: List[Scene],
+        master_audio_path: str,
+        output_path: str,
+        execution_id: str,
+        width: int = 1280,
+        height: int = 720,
+        fps: int = 24,
+    ) -> str:
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         temp_dir = settings.get_absolute_path(settings.TEMP_DIR)
         os.makedirs(temp_dir, exist_ok=True)
@@ -30,14 +39,20 @@ class FFmpegService:
                 clean_path = os.path.abspath(scene.video_path).replace("\\", "/")
                 f.write(f"file '{clean_path}'\n")
 
-        # 2. Build and execute FFmpeg command
-        # Concatenate video streams and mux with master audio
+        # Letterbox / pillarbox to the selected aspect without stretching.
+        vf = (
+            f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black,"
+            f"fps={fps},setsar=1"
+        )
+
         cmd = [
             "ffmpeg", "-y",
             "-f", "concat",
             "-safe", "0",
             "-i", concat_file,
             "-i", master_audio_path,
+            "-vf", vf,
             "-c:v", "libx264",
             "-pix_fmt", "yuv420p",
             "-preset", "fast",
@@ -49,10 +64,15 @@ class FFmpegService:
             output_path
         ]
 
-        telemetry.emit("ffmpeg_assembly_started", execution_id, {"output_path": output_path})
+        telemetry.emit("ffmpeg_assembly_started", execution_id, {
+            "output_path": output_path,
+            "width": width,
+            "height": height,
+            "fps": fps,
+        })
         
         try:
-            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
         except subprocess.CalledProcessError as e:
             telemetry.emit("ffmpeg_assembly_failed", execution_id, {"stderr": e.stderr}, level="error")
             raise FFmpegProcessingError(f"FFmpeg assembly failed: {e.stderr}")
@@ -67,6 +87,11 @@ class FFmpegService:
         is_valid, info = validate_video_file(output_path)
         if not is_valid:
             raise FFmpegProcessingError(f"Assembled video failed validation: {info.get('error')}")
+        if int(info.get("width") or 0) != int(width) or int(info.get("height") or 0) != int(height):
+            raise FFmpegProcessingError(
+                f"Assembled video dimensions {info.get('width')}x{info.get('height')} "
+                f"do not match requested {width}x{height}."
+            )
 
         telemetry.emit("ffmpeg_assembly_completed", execution_id, info)
         return output_path
@@ -92,9 +117,36 @@ class FFmpegService:
                 f.write(f"{idx}\n")
                 f.write(f"{start_str} --> {end_str}\n")
                 f.write(f"{text}\n\n")
-                
+
                 current_time += scene.duration
 
         return output_srt_path
+
+    def generate_vtt_subtitles(self, scenes: List[Scene], output_vtt_path: str) -> str:
+        """Generates a standard WebVTT (.vtt) subtitle file matching scene timings."""
+        os.makedirs(os.path.dirname(output_vtt_path), exist_ok=True)
+        current_time = 0.0
+
+        def _format_vtt_time(seconds: float) -> str:
+            hrs = int(seconds // 3600)
+            mins = int((seconds % 3600) // 60)
+            secs = int(seconds % 60)
+            millis = int((seconds - int(seconds)) * 1000)
+            return f"{hrs:02d}:{mins:02d}:{secs:02d}.{millis:03d}"
+
+        with open(output_vtt_path, "w", encoding="utf-8") as f:
+            f.write("WEBVTT\n\n")
+            for idx, scene in enumerate(scenes, 1):
+                start_str = _format_vtt_time(current_time)
+                end_str = _format_vtt_time(current_time + scene.duration)
+                text = scene.narrative or scene.title
+
+                f.write(f"{idx}\n")
+                f.write(f"{start_str} --> {end_str}\n")
+                f.write(f"{text}\n\n")
+
+                current_time += scene.duration
+
+        return output_vtt_path
 
 ffmpeg_service = FFmpegService()

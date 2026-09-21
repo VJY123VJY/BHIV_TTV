@@ -1,11 +1,10 @@
-import os
 import time
 from typing import Dict, Any, List, Optional, Callable
 from app.models.scene import Scene
 from app.core.config import settings
 from app.core.logging import telemetry
 from app.core.security import governance_guard
-from app.core.exceptions import TTVException, ValidationError, VisualGenerationError, FFmpegProcessingError
+from app.core.exceptions import VisualGenerationError
 from app.services.prompt_service import prompt_service
 from app.services.story_service import story_service
 from app.services.scene_service import scene_service
@@ -16,81 +15,118 @@ from app.services.tts_service import tts_service
 from app.services.audio_service import audio_service
 from app.services.ffmpeg_service import ffmpeg_service
 from app.services.storage_service import storage_service
+from app.services.reference_service import reference_service
+from app.services.lipsync_service import lipsync_service
+from app.services.localization_service import localization_service
+from app.services.character_service import character_service
+from app.services.realtime_data_service import realtime_data_service
+from app.services.prompt_constraints import prompt_constraint_service
 from app.utils.media_check import validate_video_file
 from app.utils.hashing import generate_execution_id
+from app.utils.video_settings import resolve_video_settings
+from app.utils.languages import normalize_language
 
 class TextToVideoPipeline:
     """
     Master Text-to-Video orchestration pipeline.
-    Implements the 14-stage lifecycle across the unified architecture:
-    TEXT -> UNDERSTAND -> STORY -> SCENES -> VISUALS -> VIDEO -> AUDIO -> FINAL MP4
+    TEXT -> SETTINGS -> REFERENCE -> STORY -> SCENES -> VISUALS -> TTS -> LIPSYNC -> FFMPEG -> MP4
     """
     def __init__(self):
         self.governance = governance_guard
 
-    # Stage 1: Validate Prompt
     def validate_prompt(self, prompt: str, execution_id: str) -> str:
         telemetry.emit("stage_1_validate_prompt", execution_id, {"prompt": prompt})
         return prompt_service.validate_prompt(prompt)
 
-    # Stage 2: Understand Prompt
     async def understand_prompt(self, prompt: str, execution_id: str) -> Dict[str, Any]:
         telemetry.emit("stage_2_understand_prompt", execution_id)
         return await prompt_service.understand_prompt(prompt)
 
-    # Stage 3: Generate Story
     async def generate_story(self, prompt: str, analysis: Dict[str, Any], duration: int, execution_id: str) -> Dict[str, Any]:
         telemetry.emit("stage_3_generate_story", execution_id, {"duration": duration})
         return await story_service.generate_story(prompt, analysis, duration)
 
-    # Stage 4: Generate Script
     async def generate_script(self, story: Dict[str, Any], execution_id: str) -> Dict[str, Any]:
         telemetry.emit("stage_4_generate_script", execution_id)
-        # Story dictionary contains structured premise and act narratives
         return story
 
-    # Stage 5: Generate Scenes
     async def generate_scenes(self, script: Dict[str, Any], duration: int, style: str, execution_id: str) -> List[Scene]:
         telemetry.emit("stage_5_generate_scenes", execution_id, {"style": style})
         return await scene_service.generate_scenes(script, duration, style)
 
-    # Stage 6: Generate Visual Prompts
-    def generate_visual_prompts(self, scenes: List[Scene], style: str, analysis: Dict[str, Any], execution_id: str) -> List[Scene]:
-        telemetry.emit("stage_6_generate_visual_prompts", execution_id)
-        return vision_service.apply_visual_consistency(scenes, style, analysis)
+    def generate_visual_prompts(
+        self,
+        scenes: List[Scene],
+        style: str,
+        analysis: Dict[str, Any],
+        execution_id: str,
+        aspect_ratio: str = "16:9",
+        reference: Optional[Dict[str, Any]] = None,
+    ) -> List[Scene]:
+        telemetry.emit("stage_6_generate_visual_prompts", execution_id, {"style": style, "aspect_ratio": aspect_ratio})
+        enriched = vision_service.apply_visual_consistency(
+            scenes, style, analysis, aspect_ratio=aspect_ratio, reference=reference
+        )
+        constraints = prompt_constraint_service.build(str(analysis.get("raw_prompt", "")), analysis, style)
+        return prompt_constraint_service.apply_to_scenes(enriched, constraints)
 
-    # Stage 7: Generate Visual Assets (Keyframes)
-    async def generate_visual_assets(self, scenes: List[Scene], execution_id: str) -> List[Scene]:
-        telemetry.emit("stage_7_generate_visual_assets", execution_id)
-        return await image_service.generate_scene_keyframes(scenes, execution_id)
+    async def generate_visual_assets(
+        self,
+        scenes: List[Scene],
+        execution_id: str,
+        width: int = 1280,
+        height: int = 720,
+        reference: Optional[Dict[str, Any]] = None,
+    ) -> List[Scene]:
+        telemetry.emit("stage_7_generate_visual_assets", execution_id, {"width": width, "height": height})
+        return await image_service.generate_scene_keyframes(scenes, execution_id, width=width, height=height, reference=reference)
 
-    # Stage 8: Generate Scene Videos
-    async def generate_scene_videos(self, scenes: List[Scene], execution_id: str, fps: int = 24) -> List[Scene]:
-        telemetry.emit("stage_8_generate_scene_videos", execution_id, {"fps": fps})
-        return await video_service.generate_scene_videos(scenes, execution_id, fps)
+    async def generate_scene_videos(
+        self,
+        scenes: List[Scene],
+        execution_id: str,
+        fps: int = 24,
+        width: int = 1280,
+        height: int = 720,
+    ) -> List[Scene]:
+        telemetry.emit("stage_8_generate_scene_videos", execution_id, {"fps": fps, "width": width, "height": height})
+        return await video_service.generate_scene_videos(scenes, execution_id, fps, width=width, height=height)
 
-    # Stage 9: Generate Voice
-    async def generate_voice(self, scenes: List[Scene], voice_enabled: bool, execution_id: str) -> List[Scene]:
-        telemetry.emit("stage_9_generate_voice", execution_id, {"enabled": voice_enabled})
+    async def generate_voice(
+        self,
+        scenes: List[Scene],
+        voice_enabled: bool,
+        execution_id: str,
+        language: str = "en",
+        voice: Optional[str] = None,
+    ) -> List[Scene]:
+        telemetry.emit("stage_9_generate_voice", execution_id, {"enabled": voice_enabled, "language": language})
         if voice_enabled:
-            return await tts_service.generate_scene_narration(scenes, execution_id)
+            return await tts_service.generate_scene_narration(scenes, execution_id, language=language, voice=voice)
         return scenes
 
-    # Stage 10: Process Audio
     def process_audio(self, scenes: List[Scene], total_duration: float, execution_id: str) -> str:
         telemetry.emit("stage_10_process_audio", execution_id)
         temp_dir = settings.get_absolute_path(settings.TEMP_DIR)
         audio_out = str(temp_dir / f"{execution_id}_master_audio.wav")
         return audio_service.mix_complete_audio(scenes, total_duration, audio_out)
 
-    # Stage 11: Assemble Video
-    def assemble_video(self, scenes: List[Scene], master_audio_path: str, execution_id: str) -> str:
-        telemetry.emit("stage_11_assemble_video", execution_id)
+    def assemble_video(
+        self,
+        scenes: List[Scene],
+        master_audio_path: str,
+        execution_id: str,
+        width: int = 1280,
+        height: int = 720,
+        fps: int = 24,
+    ) -> str:
+        telemetry.emit("stage_11_assemble_video", execution_id, {"width": width, "height": height, "fps": fps})
         temp_dir = settings.get_absolute_path(settings.TEMP_DIR)
         raw_final = str(temp_dir / f"{execution_id}_assembled.mp4")
-        return ffmpeg_service.assemble_final_video(scenes, master_audio_path, raw_final, execution_id)
+        return ffmpeg_service.assemble_final_video(
+            scenes, master_audio_path, raw_final, execution_id, width=width, height=height, fps=fps
+        )
 
-    # Stage 12: Validate Video
     def validate_video(self, video_path: str, execution_id: str) -> Dict[str, Any]:
         telemetry.emit("stage_12_validate_video", execution_id)
         is_valid, info = validate_video_file(video_path)
@@ -98,7 +134,6 @@ class TextToVideoPipeline:
             raise VisualGenerationError(f"Video validation failed: {info.get('error')}")
         return info
 
-    # Stage 13: Store Output
     def store_output(
         self,
         video_path: str,
@@ -106,7 +141,10 @@ class TextToVideoPipeline:
         prompt: str,
         scenes: List[Scene],
         duration: float,
-        style: str
+        style: str,
+        resolution: str,
+        fps: int,
+        extra: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         telemetry.emit("stage_13_store_output", execution_id)
         return storage_service.persist_video_artifact(
@@ -116,11 +154,11 @@ class TextToVideoPipeline:
             scenes=scenes,
             duration=duration,
             style=style,
-            resolution=settings.DEFAULT_RESOLUTION,
-            fps=settings.DEFAULT_FPS
+            resolution=resolution,
+            fps=fps,
+            extra=extra,
         )
 
-    # Stage 14: Return Result
     def return_result(self, metadata: Dict[str, Any], execution_id: str) -> Dict[str, Any]:
         telemetry.emit("stage_14_return_result", execution_id, {
             "status": "success",
@@ -135,7 +173,6 @@ class TextToVideoPipeline:
             "metadata": metadata
         }
 
-    # Master Execution Orchestrator
     async def execute(
         self,
         prompt: str,
@@ -144,25 +181,53 @@ class TextToVideoPipeline:
         voice: bool = True,
         token: Optional[str] = None,
         job_id: Optional[str] = None,
-        progress_callback: Optional[Callable[[str, int], None]] = None
+        progress_callback: Optional[Callable[[str, int], None]] = None,
+        aspect_ratio: Optional[str] = None,
+        quality: Optional[str] = None,
+        resolution: Optional[str] = None,
+        fps: Optional[int] = None,
+        language: str = "en",
+        voice_id: Optional[str] = None,
+        reference_url: Optional[str] = None,
+        reference_type: Optional[str] = None,
+        reference_id: Optional[str] = None,
+        lipsync: bool = True,
+        model_mode: Optional[str] = None,
+        character_id: Optional[str] = None,
+        subtitles: bool = True,
+        realtime_data: bool = False,
+        music: bool = True,
     ) -> Dict[str, Any]:
-        """
-        Executes the full 14-stage generation workflow with progress tracking.
-        """
         execution_id = job_id or generate_execution_id()
         start_time = time.time()
+        video_cfg = resolve_video_settings(aspect_ratio, quality, resolution)
+        width = int(video_cfg["width"])
+        height = int(video_cfg["height"])
+        fps_value = int(fps or settings.DEFAULT_FPS)
+        language_code = normalize_language(language)
+        style_key = (style or settings.DEFAULT_STYLE).lower()
+
         models_used = {
             "llm": settings.LLM_PROVIDER,
             "image": settings.IMAGE_PROVIDER,
             "video": settings.VIDEO_PROVIDER,
-            "tts": settings.TTS_PROVIDER
+            "tts": settings.TTS_PROVIDER,
+            "lipsync": settings.LIPSYNC_PROVIDER,
         }
         gen_params = {
             "duration": duration,
-            "style": style,
+            "style": style_key,
             "voice": voice,
-            "fps": settings.DEFAULT_FPS,
-            "resolution": settings.DEFAULT_RESOLUTION
+            "fps": fps_value,
+            "resolution": video_cfg["resolution"],
+            "aspect_ratio": video_cfg["aspect_ratio"],
+            "quality": video_cfg["quality"],
+            "language": language_code,
+            "lipsync": lipsync,
+            "model_mode": model_mode or settings.MODEL_MODE,
+            "character_id": character_id,
+            "subtitles": subtitles,
+            "realtime_data": realtime_data,
         }
         telemetry.emit("pipeline_execution_started", execution_id, {
             "received_prompt": prompt,
@@ -171,7 +236,6 @@ class TextToVideoPipeline:
             "generation_parameters": gen_params
         })
 
-        # Helper to report progress
         async def _report(stage_name: str, pct: int):
             if progress_callback:
                 if callable(progress_callback):
@@ -180,58 +244,79 @@ class TextToVideoPipeline:
                         await res
 
         try:
-            # 0. Governance & Token Verification
             self.governance.verify_execution(token=token, execution_id=execution_id)
 
-            # 1. Validate Prompt
-            await _report("validating_prompt", 5)
+            await _report("validating_settings", 4)
             clean_prompt = self.validate_prompt(prompt, execution_id)
 
-            # 2. Understand Prompt
+            await _report("processing_reference", 8)
+            reference = await reference_service.resolve(reference_url, reference_id, reference_type)
+
+            # This is inference-time context only. It never changes a training
+            # manifest and is omitted entirely if no configured provider succeeds.
+            if realtime_data:
+                await _report("retrieving_realtime_data", 10)
+                realtime_context = await realtime_data_service.fetch_realtime_context(clean_prompt)
+                clean_prompt = realtime_data_service.enrich_prompt_with_knowledge(clean_prompt, realtime_context)
+            else:
+                realtime_context = None
+
             await _report("understanding_prompt", 12)
             analysis = await self.understand_prompt(clean_prompt, execution_id)
 
-            # 3. Generate Story
             await _report("generating_story", 20)
             story = await self.generate_story(clean_prompt, analysis, duration, execution_id)
 
-            # 4. Generate Script
             await _report("generating_script", 28)
             script = await self.generate_script(story, execution_id)
 
-            # 5. Generate Scenes
             await _report("generating_scenes", 35)
-            scenes = await self.generate_scenes(script, duration, style, execution_id)
+            scenes = await self.generate_scenes(script, duration, style_key, execution_id)
+            scenes = localization_service.apply(scenes, language_code, analysis)
+            scenes = character_service.apply_character_consistency(scenes, character_id, language_code)
 
-            # 6. Generate Visual Prompts (Visual Consistency)
+            profile = character_service.get_profile(character_id)
+            if profile and not voice_id and profile.voice_id.lower().startswith(language_code.lower()):
+                voice_id = profile.voice_id
+
             await _report("applying_visual_consistency", 42)
-            scenes = self.generate_visual_prompts(scenes, style, analysis, execution_id)
+            scenes = self.generate_visual_prompts(
+                scenes, style_key, analysis, execution_id, video_cfg["aspect_ratio"], reference
+            )
 
-            # 7. Generate Visual Assets (Keyframe Images)
             await _report("generating_keyframes", 55)
-            scenes = await self.generate_visual_assets(scenes, execution_id)
+            scenes = await self.generate_visual_assets(scenes, execution_id, width, height, reference)
 
-            # 8. Generate Scene Videos
             await _report("rendering_scene_videos", 68)
-            scenes = await self.generate_scene_videos(scenes, execution_id, fps=settings.DEFAULT_FPS)
+            scenes = await self.generate_scene_videos(scenes, execution_id, fps=fps_value, width=width, height=height)
 
-            # 9. Generate Voice / TTS
-            await _report("synthesizing_voice", 78)
-            scenes = await self.generate_voice(scenes, voice, execution_id)
+            await _report("synthesizing_voice", 76)
+            scenes = await self.generate_voice(scenes, voice, execution_id, language=language_code, voice=voice_id)
 
-            # 10. Process Audio
-            await _report("mixing_audio", 85)
-            master_audio = self.process_audio(scenes, float(duration), execution_id)
+            await _report("applying_lipsync", 82)
+            scenes = await lipsync_service.apply_to_scenes(scenes, execution_id, enabled=bool(lipsync and voice))
 
-            # 11. Assemble Video
+            await _report("mixing_audio", 86)
+            original_music_setting = settings.BACKGROUND_MUSIC_ENABLED
+            try:
+                settings.BACKGROUND_MUSIC_ENABLED = bool(music)
+                master_audio = self.process_audio(scenes, float(duration), execution_id)
+            finally:
+                settings.BACKGROUND_MUSIC_ENABLED = original_music_setting
+
             await _report("assembling_final_video", 92)
-            final_raw_video = self.assemble_video(scenes, master_audio, execution_id)
+            final_raw_video = self.assemble_video(
+                scenes, master_audio, execution_id, width=width, height=height, fps=fps_value
+            )
 
-            # 12. Validate Video
             await _report("validating_video", 95)
             validation_info = self.validate_video(final_raw_video, execution_id)
+            if int(validation_info.get("width") or 0) != width or int(validation_info.get("height") or 0) != height:
+                raise VisualGenerationError(
+                    f"Final video is {validation_info.get('width')}x{validation_info.get('height')}, "
+                    f"expected {width}x{height}."
+                )
 
-            # 13. Store Output
             await _report("storing_artifacts", 98)
             metadata = self.store_output(
                 video_path=final_raw_video,
@@ -239,12 +324,36 @@ class TextToVideoPipeline:
                 prompt=clean_prompt,
                 scenes=scenes,
                 duration=float(duration),
-                style=style
+                style=style_key,
+                resolution=video_cfg["resolution"],
+                fps=fps_value,
+                extra={
+                    "aspect_ratio": video_cfg["aspect_ratio"],
+                    "quality": video_cfg["quality"],
+                    "language": language_code,
+                    "lipsync": bool(lipsync and voice),
+                    "voice_enabled": voice,
+                    "character_id": character_id,
+                    "realtime_data": realtime_context,
+                    "settings": gen_params,
+                },
             )
+            if subtitles and voice:
+                subtitle_dir = settings.get_absolute_path(settings.TEMP_DIR)
+                srt = ffmpeg_service.generate_srt_subtitles(scenes, str(subtitle_dir / f"{execution_id}.srt"))
+                vtt = ffmpeg_service.generate_vtt_subtitles(scenes, str(subtitle_dir / f"{execution_id}.vtt"))
+                metadata["subtitles"] = {
+                    "language": language_code,
+                    "srt_url": storage_service.persist_subtitle_artifact(execution_id, srt, "srt"),
+                    "vtt_url": storage_service.persist_subtitle_artifact(execution_id, vtt, "vtt"),
+                }
+                # Persist the newly-added subtitle URLs in the existing sidecar.
+                sidecar = settings.get_absolute_path(settings.OUTPUT_DIR) / f"{execution_id}_metadata.json"
+                import json
+                sidecar.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
             metadata["processing_time_s"] = round(time.time() - start_time, 2)
             metadata["validation"] = validation_info
 
-            # 14. Return Result
             await _report("completed", 100)
             return self.return_result(metadata, execution_id)
 

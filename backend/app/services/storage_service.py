@@ -1,7 +1,7 @@
 import os
 import json
 import shutil
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pathlib import Path
 from app.core.config import settings
 from app.models.scene import Scene
@@ -26,7 +26,8 @@ class StorageService:
         duration: float,
         style: str,
         resolution: str = "1280x720",
-        fps: int = 24
+        fps: int = 24,
+        extra: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Persists video, writes sidecar metadata JSON, and returns artifact payload."""
         final_filename = f"{execution_id}.mp4"
@@ -51,6 +52,8 @@ class StorageService:
             "scenes": [s.to_dict() for s in scenes],
             "created_at": Path(final_dest).stat().st_mtime
         }
+        if extra:
+            metadata.update(extra)
 
         # Save metadata JSON sidecar
         meta_file = self.output_dir / f"{execution_id}_metadata.json"
@@ -71,6 +74,13 @@ class StorageService:
             raise FileNotFoundError(f"Metadata for video '{video_id}' not found.")
         with open(meta_file, "r", encoding="utf-8") as f:
             return json.load(f)
+
+    def persist_subtitle_artifact(self, execution_id: str, source_path: str, extension: str) -> str:
+        """Copy a generated subtitle sidecar beside the final MP4 and return its URL."""
+        destination = self.output_dir / f"{execution_id}.{extension.lstrip('.')}"
+        if os.path.abspath(source_path) != os.path.abspath(destination):
+            shutil.copy2(source_path, destination)
+        return f"/generated/videos/{destination.name}"
 
     def get_video_path(self, video_id: str) -> Path:
         video_file = self.output_dir / f"{video_id}.mp4"

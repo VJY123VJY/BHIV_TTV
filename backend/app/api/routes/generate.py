@@ -1,14 +1,36 @@
 import asyncio
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from app.schemas.request import GenerationRequest
-from app.schemas.response import GenerationResponse
+from fastapi import APIRouter, UploadFile, File, Form
+from typing import Optional
+
+from app.schemas.request import GenerationRequest, SUPPORTED_STYLES
+from app.schemas.response import GenerationResponse, GenerationSettings, ReferenceUploadResponse
 from app.core.queue import job_manager
 from app.pipelines.text_to_video import pipeline
 from app.utils.hashing import generate_execution_id
 from app.core.config import settings
 from app.core.logging import telemetry
+from app.utils.video_settings import resolve_video_settings, catalog as video_catalog
+from app.utils.languages import catalog as language_catalog
+from app.services.reference_service import reference_service
 
 router = APIRouter()
+
+
+def _resolved_settings(request: GenerationRequest) -> GenerationSettings:
+    video_cfg = resolve_video_settings(request.aspect_ratio, request.quality, request.resolution)
+    return GenerationSettings(
+        aspect_ratio=video_cfg["aspect_ratio"],
+        quality=video_cfg["quality"],
+        resolution=video_cfg["resolution"],
+        style=request.style or "cinematic",
+        language=request.language or "en",
+        fps=request.fps or 24,
+        lipsync=True if request.lipsync is None else request.lipsync,
+        character_id=request.character_id,
+        subtitles=True if request.subtitles is None else request.subtitles,
+        realtime_data=False if request.realtime_data is None else request.realtime_data,
+    )
+
 
 async def _run_generation_task(job_id: str, request: GenerationRequest):
     """Background execution runner with progress updates."""
@@ -23,12 +45,66 @@ async def _run_generation_task(job_id: str, request: GenerationRequest):
             voice=request.voice if request.voice is not None else True,
             token=request.token,
             job_id=job_id,
-            progress_callback=_progress_callback
+            progress_callback=_progress_callback,
+            aspect_ratio=request.aspect_ratio,
+            quality=request.quality,
+            resolution=request.resolution,
+            fps=request.fps,
+            language=request.language or "en",
+            voice_id=request.voice_id,
+            reference_url=request.reference_url,
+            reference_type=request.reference_type,
+            reference_id=request.reference_id,
+            lipsync=True if request.lipsync is None else request.lipsync,
+            model_mode=request.model_mode,
+            character_id=request.character_id,
+            subtitles=True if request.subtitles is None else request.subtitles,
+            realtime_data=False if request.realtime_data is None else request.realtime_data,
+            music=True if request.music is None else request.music,
         )
         await job_manager.complete_job(job_id, result.get("metadata", {}))
     except Exception as e:
         telemetry.emit("job_execution_failed", job_id, {"error": str(e)}, level="error")
         await job_manager.fail_job(job_id, str(e))
+
+
+@router.get("/generation-options")
+async def generation_options():
+    """Catalog of formats, qualities, styles, and languages for the studio UI."""
+    return {
+        **video_catalog(),
+        **language_catalog(),
+        "styles": list(SUPPORTED_STYLES),
+        "defaults": {
+            "aspect_ratio": settings.DEFAULT_ASPECT_RATIO,
+            "quality": settings.DEFAULT_QUALITY,
+            "language": settings.DEFAULT_LANGUAGE,
+            "style": settings.DEFAULT_STYLE,
+            "fps": settings.DEFAULT_FPS,
+        },
+    }
+
+
+@router.get("/characters")
+async def characters():
+    """List built-in persistent character profiles safe to select in the studio."""
+    from app.services.character_service import character_service
+    return {"characters": character_service.list_profiles()}
+
+
+@router.post("/references/upload", response_model=ReferenceUploadResponse)
+async def upload_reference(
+    file: UploadFile = File(...),
+    reference_type: Optional[str] = Form(default=None),
+):
+    content = await file.read()
+    payload = reference_service.save_upload(file.filename or "reference.bin", content, file.content_type)
+    return ReferenceUploadResponse(
+        reference_id=payload["reference_id"],
+        media_type=payload["media_type"],
+        source="upload",
+    )
+
 
 @router.post("/generate", response_model=GenerationResponse)
 async def generate_video(request: GenerationRequest):
@@ -37,6 +113,7 @@ async def generate_video(request: GenerationRequest):
     Validates payload, initializes queue job, and dispatches processing asynchronously.
     """
     job_id = generate_execution_id()
+    resolved = _resolved_settings(request)
     telemetry.emit("request_received", job_id, {
         "received_prompt": request.prompt,
         "generation_request_id": job_id,
@@ -46,21 +123,15 @@ async def generate_video(request: GenerationRequest):
             "video": settings.VIDEO_PROVIDER,
             "tts": settings.TTS_PROVIDER
         },
-        "generation_parameters": {
-            "duration": request.duration or 15,
-            "style": request.style or "cinematic",
-            "voice": request.voice if request.voice is not None else True,
-            "fps": settings.DEFAULT_FPS,
-            "resolution": settings.DEFAULT_RESOLUTION
-        }
+        "generation_parameters": resolved.model_dump()
     })
-    await job_manager.create_job(job_id, request.model_dump())
+    await job_manager.create_job(job_id, request.model_dump(), settings=resolved.model_dump())
 
-    # Launch generation task in background
     asyncio.create_task(_run_generation_task(job_id, request))
 
     return GenerationResponse(
         job_id=job_id,
         status="queued",
-        message="Video generation job queued successfully"
+        message="Video generation job queued successfully",
+        settings=resolved,
     )

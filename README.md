@@ -28,7 +28,17 @@ This project provides an end-to-end AI platform that transforms natural language
 
 **Core Workflow:**
 ```
-TEXT → UNDERSTAND → STORY → SCENES → VISUALS → VIDEO → AUDIO → FINAL MP4
+Prompt / Script
+  → Video Format (16:9 or 9:16)
+  → Video Quality (Standard 720p / High 1080p / Ultra 4K)
+  → Reference Upload or Reference URL
+  → Visual Style
+  → Language
+  → Generate Voice + Visuals
+  → Scene Video
+  → Automatic Lip Sync
+  → FFmpeg Assembly
+  → Final MP4
 ```
 
 ---
@@ -99,29 +109,29 @@ TEXT → UNDERSTAND → STORY → SCENES → VISUALS → VIDEO → AUDIO → FIN
 
 ## 3. The 14-Stage Text-to-Video Pipeline
 
-The system is coordinated by `TextToVideoPipeline` located in `backend/app/pipelines/text_to_video.py`, executing 14 modular stages:
+The system is coordinated by `TextToVideoPipeline` located in `backend/app/pipelines/text_to_video.py`:
 
-1. **`validate_prompt()`**: Sanitizes input, enforces length and security constraints.
-2. **`understand_prompt()`**: Extracts primary subject, setting, lighting, mood, and keywords.
-3. **`generate_story()`**: Formulates a cohesive 3-act narrative structure.
-4. **`generate_script()`**: Derives dialogue, narration, and action beats.
-5. **`generate_scenes()`**: Allocates time and schedules scenes with camera motions (pan, zoom, tilt).
-6. **`generate_visual_prompts()`**: Injects continuity tags, lighting, and style locks.
-7. **`generate_visual_assets()`**: Synthesizes high-resolution keyframe images for each scene.
-8. **`generate_scene_videos()`**: Animates keyframes using sub-pixel camera vectors and atmospheric particles into scene clips.
-9. **`generate_voice()`**: Generates speech audio for narration via multi-tier TTS.
-10. **`process_audio()`**: Synthesizes harmonic ambient score, applies audio ducking, and builds master audio.
-11. **`assemble_video()`**: Multiplexes video and audio into a unified H.264 container with FFmpeg.
-12. **`validate_video()`**: Programmatically decodes frames via OpenCV to verify playable video.
-13. **`store_output()`**: Moves MP4 to persistent storage and writes metadata JSON sidecar.
-14. **`return_result()`**: Returns execution payload and status to the client.
+1. **Validate settings & prompt**: Aspect ratio, quality, language, FPS, duration, and prompt.
+2. **Process reference**: Upload ID or public URL → validated retrieval → still frame.
+3. **Understand prompt**: Subject, setting, lighting, mood.
+4. **Generate story & script**: Multi-act narrative.
+5. **Generate scenes**: Timed shots with camera motion.
+6. **Localize narration**: Scene dialogue is rewritten in the selected language before TTS.
+7. **Visual prompts**: Style lock, aspect-aware framing, reference identity.
+8. **Image generation**: Keyframes at the selected `width x height`.
+9. **Scene video generation**: Motion clips at the same resolution and FPS.
+10. **Language-specific TTS**: Edge TTS / gTTS for `en`, `hi`, `mr`, `gu`, `fr`, `es`, `de`.
+11. **Automatic lip sync**: Viseme mouth animation (optional Wav2Lip checkpoint). Scenes without a visible face are skipped, not failed.
+12. **Audio mix + FFmpeg assembly**: Pad/scale without stretching, enforce output dimensions.
+13. **Validate & store**: Confirm MP4 dimensions, persist sidecar metadata.
+14. **Return result**: Job metadata including selected settings.
 
 ---
 
 ## 4. Text-to-Vision Integration
 
 Text-to-Vision functionality is directly integrated as the **Visual Generation Stage** of the pipeline rather than a detached tool. It provides:
-- **Style Presets**: Standardized artistic profiles (`cinematic`, `anime`, `cyberpunk`, `realistic`, `fantasy`).
+- **Style Presets**: `realistic`, `cartoon`, `cinematic`, `3d`, `anime`, `fantasy`, `cyberpunk`.
 - **Subject Anchoring**: Cross-scene prompt tags preserving subject appearance, wardrobe, and features.
 - **Lighting & Color Palette Locks**: Synchronizes ambient color gradients across scene transitions.
 - **Image Validation**: Probes generated keyframes before passing them to the video motion synthesizer.
@@ -137,8 +147,10 @@ The system avoids vendor lock-in through pluggable abstract adapters in `backend
 | **LLM** | `local` (offline NLP engine), `openai` (GPT-4o), `gemini` (Gemini 1.5) | `LLM_PROVIDER` |
 | **Image** | `local` (procedural / PIL / OpenCV), `openai` (DALL-E 3) | `IMAGE_PROVIDER` |
 | **Video** | `opencv` (kinematic motion synthesis), `external` (API router) | `VIDEO_PROVIDER` |
-| **TTS** | `local` (EdgeTTS / gTTS / Formant wave synthesizer) | `TTS_PROVIDER` |
+| **TTS** | `local` (EdgeTTS / gTTS; English-only offline formant fallback) | `TTS_PROVIDER` |
 | **Vision** | `standard` (consistency & continuity engine) | `VISION_PROVIDER` |
+| **Reference** | Direct HTTP(S) media + `yt-dlp` social sources | — |
+| **Lip-sync** | `viseme` (offline mouth animation) or `wav2lip` | `LIPSYNC_PROVIDER` |
 
 ---
 

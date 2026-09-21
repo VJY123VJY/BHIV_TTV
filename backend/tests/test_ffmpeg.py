@@ -35,7 +35,9 @@ async def test_ffmpeg_assembly_pipeline(tmp_path):
 
     # 3. Assemble final video via FFmpeg
     final_mp4 = str(tmp_path / "final_assembled.mp4")
-    assembled = ffmpeg_service.assemble_final_video(scenes, final_audio, final_mp4, "test_exec_001")
+    assembled = ffmpeg_service.assemble_final_video(
+        scenes, final_audio, final_mp4, "test_exec_001", width=320, height=240, fps=15
+    )
     assert os.path.exists(assembled)
 
     # 4. Media validation
@@ -43,3 +45,38 @@ async def test_ffmpeg_assembly_pipeline(tmp_path):
     assert is_valid
     assert info["frame_count"] > 0
     assert info["duration"] > 0
+    assert info["width"] == 320
+    assert info["height"] == 240
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "width,height",
+    [
+        (1280, 720),
+        (1920, 1080),
+        (3840, 2160),
+        (720, 1280),
+        (1080, 1920),
+        (2160, 3840),
+    ],
+)
+async def test_ffmpeg_respects_aspect_and_quality(tmp_path, width, height):
+    img_adapter = LocalImageAdapter()
+    vid_adapter = OpenCVVideoAdapter()
+    img_p = str(tmp_path / "scene.jpg")
+    await img_adapter.generate_image("A farm path", img_p, width=160, height=160)
+    scene = Scene(index=1, title="Scene", narrative="Walking", visual_description="Farm", duration=1.0)
+    vid_p = str(tmp_path / "scene.mp4")
+    await vid_adapter.generate_scene_video(scene, img_p, vid_p, width=160, height=160, fps=8)
+    scene.video_path = vid_p
+    audio_p = str(tmp_path / "audio.wav")
+    audio_service.mix_complete_audio([scene], 1.0, audio_p)
+    final_mp4 = str(tmp_path / f"final_{width}x{height}.mp4")
+    assembled = ffmpeg_service.assemble_final_video(
+        [scene], audio_p, final_mp4, f"dim_{width}_{height}", width=width, height=height, fps=8
+    )
+    is_valid, info = validate_video_file(assembled)
+    assert is_valid
+    assert info["width"] == width
+    assert info["height"] == height

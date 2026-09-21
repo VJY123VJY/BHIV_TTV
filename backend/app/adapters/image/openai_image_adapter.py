@@ -21,16 +21,22 @@ class OpenAIImageAdapter(BaseImageAdapter):
         if not self.client:
             return await self.fallback.generate_image(prompt, output_path, style, width, height)
         try:
-            enhanced_prompt = f"{prompt}, {style} style, ultra-detailed, photorealistic, 16:9 widescreen composition."
+            dalle_size = "1792x1024" if width >= height else "1024x1792"
+            aspect_hint = "16:9 widescreen composition" if width >= height else "9:16 vertical composition"
+            enhanced_prompt = f"{prompt}, {style} style, ultra-detailed, {aspect_hint}."
             response = self.client.images.generate(
                 model="dall-e-3",
                 prompt=enhanced_prompt[:950],
-                size="1792x1024",
+                size=dalle_size,
                 quality="standard",
                 n=1
             )
             image_url = response.data[0].url
             urllib.request.urlretrieve(image_url, output_path)
+            from PIL import Image
+            with Image.open(output_path) as img:
+                resized = img.convert("RGB").resize((width, height))
+                resized.save(output_path, quality=92)
             return output_path
         except Exception as e:
             telemetry.emit("dalle_generation_failed", "system", {"error": str(e)}, level="warning")

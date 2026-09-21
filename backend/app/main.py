@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 import os
 from pathlib import Path
 from fastapi import FastAPI, Request
@@ -9,10 +10,22 @@ from app.core.logging import logger, telemetry
 from app.core.exceptions import TTVException, ValidationError, GovernanceViolationError
 from app.api.routes import generate, jobs, videos, health
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    settings.ensure_directories()
+    logger.info("Unified Text-to-Video Engine initialized successfully.")
+    telemetry.emit("system_startup", "system", {
+        "llm_provider": settings.LLM_PROVIDER,
+        "video_provider": settings.VIDEO_PROVIDER,
+        "tts_provider": settings.TTS_PROVIDER
+    })
+    yield
+
 app = FastAPI(
     title="Unified Text-to-Video Engine",
     version="1.0.0",
-    description="Consolidated production-ready Text-to-Video AI microservice."
+    description="Consolidated production-ready Text-to-Video AI microservice.",
+    lifespan=lifespan
 )
 
 # CORS Middleware
@@ -68,13 +81,3 @@ if frontend_dir.exists():
         return {"message": "Unified Text-to-Video API is running. Frontend index.html not found."}
 
     app.mount("/static", StaticFiles(directory=str(frontend_dir)), name="static")
-
-@app.on_event("startup")
-async def on_startup():
-    settings.ensure_directories()
-    logger.info("Unified Text-to-Video Engine initialized successfully.")
-    telemetry.emit("system_startup", "system", {
-        "llm_provider": settings.LLM_PROVIDER,
-        "video_provider": settings.VIDEO_PROVIDER,
-        "tts_provider": settings.TTS_PROVIDER
-    })

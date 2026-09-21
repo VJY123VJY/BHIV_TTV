@@ -162,19 +162,156 @@
 
                             <!-- Primary Controls Grid -->
                             <div class="generation-controls-grid">
-                                <!-- Model Selection -->
+                                <div class="control-group control-span-2">
+                                    <label class="field-label">Video Format</label>
+                                    <div class="aspect-ratio-toggle-group">
+                                        <button type="button" class="aspect-btn active" data-aspect="16:9">
+                                            <span class="aspect-box aspect-16-9"></span>
+                                            <span>16:9 — Landscape / YouTube</span>
+                                        </button>
+                                        <button type="button" class="aspect-btn" data-aspect="9:16">
+                                            <span class="aspect-box aspect-9-16"></span>
+                                            <span>9:16 — Vertical / Reels / Shorts</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="control-group control-span-2">
+                                    <label class="field-label">Video Quality</label>
+                                    <div class="quality-toggle-group" id="quality-toggle-group">
+                                        <button type="button" class="quality-btn active" data-quality="standard">Standard — 720p</button>
+                                        <button type="button" class="quality-btn" data-quality="high">High — 1080p</button>
+                                        <button type="button" class="quality-btn" data-quality="ultra">Ultra — 4K</button>
+                                    </div>
+                                    <p class="output-readout" id="output-readout">Output: 1280 × 720</p>
+                                </div>
+
+                                <div class="control-group control-span-2">
+                                    <label class="field-label">Reference</label>
+                                    <div class="reference-actions">
+                                        <button type="button" class="ref-action-btn" id="upload-image-btn">Upload Image</button>
+                                        <button type="button" class="ref-action-btn" id="upload-video-btn">Upload Video</button>
+                                        <button type="button" class="ref-action-btn" id="paste-link-btn">Paste Reference Link</button>
+                                    </div>
+                                    <input type="file" id="reference-image-input" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+                                    <input type="file" id="reference-video-input" accept="video/mp4,video/webm,video/quicktime" hidden>
+                                    <input type="url" id="reference-url-input" class="hero-prompt-textarea reference-url-input hidden" placeholder="Paste YouTube / Instagram / Facebook / X / Image / Video URL">
+                                    <p class="output-readout" id="reference-status">No reference selected</p>
+                                </div>
+
                                 <div class="control-group">
-                                    <label for="model-select" class="field-label">Model Architecture</label>
+                                    <label for="style-select" class="field-label">Visual Style</label>
                                     <div class="select-wrapper">
-                                        <select id="model-select">
-                                            <option value="base" selected>SpatialTemporal TTV (Base Engine)</option>
-                                            <option value="finetuned">SpatialTemporal LoRA (Fine-Tuned v001)</option>
+                                        <select id="style-select">
+                                            <option value="realistic">Realistic / Photorealistic</option>
+                                            <option value="cartoon">Cartoon / Cartoonish</option>
+                                            <option value="cinematic" selected>Cinematic / Film Look</option>
+                                            <option value="3d">3D / Stylized</option>
+                                            <option value="anime">Anime</option>
+                                            <option value="fantasy">Fantasy</option>
+                                            <option value="cyberpunk">Cyberpunk</option>
                                         </select>
                                         <span class="select-arrow">▼</span>
                                     </div>
                                 </div>
 
-                                <!-- Duration Selector -->
+                                <div class="control-group">
+                                    <label for="language-select" class="field-label">Language</label>
+                                    <div class="select-wrapper">
+                                        <select id="language-select">
+                                            <option value="en" selected>English</option>
+                                            <option value="hi">Hindi</option>
+                                            <option value="mr">Marathi</option>
+                                            <option value="ta">Tamil</option>
+                                            <option value="te">Telugu</option>
+                                            <option value="kn">Kannada</option>
+                                            <option value="bn">Bengali</option>
+                                            <option value="gu">Gujarati</option>
+                                            <option value="pa">Punjabi</option>
+                                            <option value="ml">Malayalam</option>
+                                            <option value="ur">Urdu</option>
+                                            <option value="fr">French</option>
+                                            <option value="es">Spanish</option>
+                                            <option value="de">German</option>
+                                            <option value="ja">Japanese</option>
+                                        </select>
+                                        <span class="select-arrow">▼</span>
+                                    </div>
+                                </div>
+
+                                <div class="control-group">
+                                    <label for="voice-select" class="field-label">Voice</label>
+                                    <div class="select-wrapper">
+                                        <select id="voice-select"></select>
+                                        <span class="select-arrow">▼</span>
+                                    </div>
+                                </div>
+
+                                <div class="control-group">
+                                    <label for="character-select" class="field-label">Character</label>
+                                    <div class="select-wrapper">
+                                        <select id="character-select">
+                                            <option value="">Auto from prompt</option>
+                                            <option value="rahul_farmer">Rahul — Male farmer</option>
+                                            <option value="priya_teacher">Priya — Teacher</option>
+                                            <option value="alex_explorer">Alex — Explorer</option>
+                                        </select>
+                                        <span class="select-arrow">▼</span>
+                                    </div>
+                                </div>
+
+                                <div class="control-group toggle-group">
+                                    <label class="toggle-container" for="voice-toggle">
+                                        <div class="toggle-text-block">
+                                            <span class="toggle-title">Voice Narration (TTS)</span>
+                                            <span class="toggle-desc">Generate speech in the selected language</span>
+                                        </div>
+                                        <div class="switch-wrap">
+                                            <input type="checkbox" id="voice-toggle" checked>
+                                            <span class="slider-round"></span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <div class="control-group toggle-group">
+                                    <label class="toggle-container" for="subtitles-toggle">
+                                        <div class="toggle-text-block">
+                                            <span class="toggle-title">Subtitles</span>
+                                            <span class="toggle-desc">Create timed captions from spoken dialogue</span>
+                                        </div>
+                                        <div class="switch-wrap">
+                                            <input type="checkbox" id="subtitles-toggle" checked>
+                                            <span class="slider-round"></span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <div class="control-group toggle-group">
+                                    <label class="toggle-container" for="music-toggle">
+                                        <div class="toggle-text-block">
+                                            <span class="toggle-title">Music & ambience</span>
+                                            <span class="toggle-desc">Add a ducked ambient music bed under dialogue</span>
+                                        </div>
+                                        <div class="switch-wrap">
+                                            <input type="checkbox" id="music-toggle" checked>
+                                            <span class="slider-round"></span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <div class="control-group toggle-group">
+                                    <label class="toggle-container" for="realtime-toggle">
+                                        <div class="toggle-text-block">
+                                            <span class="toggle-title">Real-time data</span>
+                                            <span class="toggle-desc">Use an approved live provider when configured</span>
+                                        </div>
+                                        <div class="switch-wrap">
+                                            <input type="checkbox" id="realtime-toggle">
+                                            <span class="slider-round"></span>
+                                        </div>
+                                    </label>
+                                </div>
+
                                 <div class="control-group">
                                     <div class="slider-label-row">
                                         <label for="duration-slider" class="field-label">Duration</label>
@@ -190,32 +327,12 @@
                                     </div>
                                 </div>
 
-                                <!-- Aspect Ratio Selector -->
                                 <div class="control-group">
-                                    <label class="field-label">Aspect Ratio</label>
-                                    <div class="aspect-ratio-toggle-group">
-                                        <button type="button" class="aspect-btn active" data-aspect="16:9" data-res="1280x720">
-                                            <span class="aspect-box aspect-16-9"></span>
-                                            <span>16:9 Widescreen</span>
-                                        </button>
-                                        <button type="button" class="aspect-btn" data-aspect="9:16" data-res="720x1280">
-                                            <span class="aspect-box aspect-9-16"></span>
-                                            <span>9:16 Vertical</span>
-                                        </button>
-                                        <button type="button" class="aspect-btn" data-aspect="1:1" data-res="1080x1080">
-                                            <span class="aspect-box aspect-1-1"></span>
-                                            <span>1:1 Square</span>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Quality / Resolution -->
-                                <div class="control-group">
-                                    <label for="resolution-select" class="field-label">Quality / Resolution</label>
+                                    <label for="model-select" class="field-label">Model Architecture</label>
                                     <div class="select-wrapper">
-                                        <select id="resolution-select">
-                                            <option value="1280x720" selected>720p HD (1280 × 720)</option>
-                                            <option value="1920x1080">1080p FHD (1920 × 1080)</option>
+                                        <select id="model-select">
+                                            <option value="base" selected>SpatialTemporal TTV (Base Engine)</option>
+                                            <option value="finetuned">SpatialTemporal LoRA (Fine-Tuned v001)</option>
                                         </select>
                                         <span class="select-arrow">▼</span>
                                     </div>
@@ -232,20 +349,6 @@
                                     <span class="accordion-chevron">▶</span>
                                 </summary>
                                 <div class="advanced-content-grid">
-                                    <div class="control-group">
-                                        <label for="style-select" class="field-label">Visual Aesthetic Style</label>
-                                        <div class="select-wrapper">
-                                            <select id="style-select">
-                                                <option value="cinematic" selected>Cinematic 35mm Film Still</option>
-                                                <option value="anime">Anime / Japanese Aesthetic</option>
-                                                <option value="cyberpunk">Cyberpunk Metropolis</option>
-                                                <option value="realistic">National Geographic Photorealistic</option>
-                                                <option value="fantasy">Epic High Fantasy</option>
-                                            </select>
-                                            <span class="select-arrow">▼</span>
-                                        </div>
-                                    </div>
-
                                     <div class="control-group">
                                         <label for="seed-input" class="field-label">Generation Seed</label>
                                         <div class="seed-input-wrapper">
@@ -269,13 +372,13 @@
                                     </div>
 
                                     <div class="control-group toggle-group">
-                                        <label class="toggle-container" for="voice-toggle">
+                                        <label class="toggle-container" for="lipsync-toggle">
                                             <div class="toggle-text-block">
-                                                <span class="toggle-title">Voice Narration (TTS)</span>
-                                                <span class="toggle-desc">Generate synchronized speech narration across scenes</span>
+                                                <span class="toggle-title">Automatic Lip Sync</span>
+                                                <span class="toggle-desc">Drive mouth motion from dialogue when a face is visible</span>
                                             </div>
                                             <div class="switch-wrap">
-                                                <input type="checkbox" id="voice-toggle" checked>
+                                                <input type="checkbox" id="lipsync-toggle" checked>
                                                 <span class="slider-round"></span>
                                             </div>
                                         </label>

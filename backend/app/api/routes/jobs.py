@@ -18,7 +18,8 @@ async def get_job_status(job_id: str):
             created_at=job["created_at"],
             updated_at=job["updated_at"],
             result=job.get("result"),
-            error=job.get("error")
+            error=job.get("error"),
+            settings=job.get("settings"),
         )
     except JobNotFoundError:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
