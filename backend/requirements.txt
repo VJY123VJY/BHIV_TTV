@@ -26,3 +26,14 @@ google-generativeai>=0.4.0
 # Testing & Quality
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
+
+# ── Wan 2.2 TI2V-5B Video Generation ─────────────────────────────────────────
+# Required only when VIDEO_PROVIDER=wan (cloud NVIDIA GPU deployment).
+# NOTE: torch is NOT listed here — install it FIRST with the correct CUDA
+#       version for your cloud GPU before running pip install -r requirements.txt
+#       See: https://pytorch.org/get-started/locally/
+diffusers>=0.33.0
+transformers>=4.51.0
+accelerate>=1.6.0
+safetensors>=0.5.3
+imageio>=2.37.0

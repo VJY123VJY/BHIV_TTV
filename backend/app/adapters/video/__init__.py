@@ -12,4 +12,9 @@ def get_video_adapter(provider: str = "opencv"):
     p = (provider or "opencv").lower()
     if p == "external":
         return ExternalVideoAdapter()
+    if p == "wan":
+        # Imported lazily: diffusers/torch are NOT required unless VIDEO_PROVIDER=wan
+        from app.adapters.video.wan_video_adapter import WanVideoAdapter
+        return WanVideoAdapter()
     return OpenCVVideoAdapter()
+

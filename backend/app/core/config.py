@@ -31,6 +31,19 @@ class Settings(BaseSettings):
     MODEL_MODE: str = "base"
     FINE_TUNED_CHECKPOINT_PATH: Optional[str] = None
 
+    # ── Wan 2.2 TI2V-5B Video Generation ─────────────────────────────────
+    # Requires NVIDIA GPU at inference time (not needed for local/opencv mode).
+    # Set VIDEO_PROVIDER=wan in your cloud environment .env to enable.
+    WAN_MODEL_ID: str = "Wan-AI/Wan2.2-TI2V-5B-Diffusers"
+    WAN_DEVICE: str = "cuda"
+    WAN_DTYPE: str = "bfloat16"
+    WAN_NUM_FRAMES: int = 81
+    WAN_INFERENCE_STEPS: int = 30
+    WAN_GUIDANCE_SCALE: float = 5.0
+    # Optional HuggingFace token for gated/private model access
+    HF_TOKEN: Optional[str] = None
+
+
     # API Keys
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
