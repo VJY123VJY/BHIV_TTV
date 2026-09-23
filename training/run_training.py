@@ -8,7 +8,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from training.datasets.manifest_builder import build_manifest_from_directory
+from training.datasets.manifest_builder import build_manifest_from_directory, prepare_reference_dataset_entry
 from training.datasets.loader import create_dataloader
 from training.fine_tuning.model import SpatialTemporalTTVModel
 from training.fine_tuning.trainer import TTVTrainer
@@ -20,6 +20,9 @@ def main():
     parser.add_argument("--config", type=str, default="training/configs/smoke_test.yaml", help="Path to YAML config")
     parser.add_argument("--resume", type=str, default=None, help="Optional checkpoint path to resume from")
     parser.add_argument("--version-name", type=str, default="ttv_lora_v001", help="Model version tag to register")
+    parser.add_argument("--reference-id", type=str, default=None, help="Reference ID to condition/fine-tune with")
+    parser.add_argument("--reference-path", type=str, default=None, help="Direct path to reference image/video")
+    parser.add_argument("--reference-url", type=str, default=None, help="Reference public media URL")
     args = parser.parse_args()
 
     config_path = Path(args.config)
@@ -38,14 +41,46 @@ def main():
             output_manifest_path=str(manifest_path)
         )
 
+    # 1b. If reference is specified, augment training manifest with reference sample
+    if args.reference_id or args.reference_path or args.reference_url:
+        print(f"[Reference] Ingesting reference into training pipeline: id={args.reference_id}, path={args.reference_path}, url={args.reference_url}")
+        from app.services.reference_service import reference_service
+        ref_payload = None
+        if args.reference_id:
+            ref_payload = reference_service.load_existing(args.reference_id)
+        elif args.reference_path:
+            p = Path(args.reference_path)
+            ref_payload = {
+                "reference_id": f"ref_{p.stem}",
+                "path": str(p.resolve()),
+                "media_type": "image" if p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"} else "video",
+                "source": "local_path",
+                "width": 1280,
+                "height": 720,
+                "still_path": str(p.resolve())
+            }
+        elif args.reference_url:
+            import asyncio
+            ref_payload = asyncio.run(reference_service.ingest_url(args.reference_url))
+
+        if ref_payload:
+            ref_manifest = PROJECT_ROOT / "training" / "datasets" / "reference_train_manifest.jsonl"
+            prepare_reference_dataset_entry(ref_payload, output_manifest_path=str(ref_manifest))
+            manifest_path = ref_manifest
+            print(f"[Reference] Reference dataset manifest prepared: {ref_manifest}")
+
     # 2. Build DataLoaders
     train_manifest = PROJECT_ROOT / cfg["paths"].get("train_manifest", cfg["paths"]["dataset_manifest"])
     val_manifest = PROJECT_ROOT / cfg["paths"].get("val_manifest", cfg["paths"]["dataset_manifest"])
+
+    if args.reference_id or args.reference_path or args.reference_url:
+        train_manifest = manifest_path
 
     if not train_manifest.exists():
         train_manifest = manifest_path
     if not val_manifest.exists():
         val_manifest = manifest_path
+
 
     train_cfg = cfg.get("training", {})
     model_cfg = cfg.get("model", {})

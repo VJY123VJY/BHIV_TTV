@@ -21,8 +21,9 @@ SAMPLES = {
 async def test_tts_accepts_supported_languages(tmp_path, language):
     tts = LocalTTSAdapter()
     out = str(tmp_path / f"voice_{language}.mp3")
+    sample_text = SAMPLES.get(language, "A farmer walks through a green field.")
     try:
-        result = await tts.synthesize_speech(SAMPLES[language], out, language=language)
+        result = await tts.synthesize_speech(sample_text, out, language=language)
     except AudioGenerationError:
         if language == "en":
             raise

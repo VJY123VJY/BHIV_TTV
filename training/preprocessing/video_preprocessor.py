@@ -28,16 +28,34 @@ class VideoPreprocessor:
         self.normalize_range = normalize_range
 
     def extract_raw_frames(self, video_path: str) -> List[np.ndarray]:
-        """Reads video file and extracts uniformly sampled RGB frames."""
+        """Reads video or image file and extracts uniformly sampled RGB frames."""
         if not os.path.exists(video_path):
             raise FileNotFoundError(f"Video file not found: {video_path}")
 
+        # If an image file is passed, duplicate across frames
+        ext = os.path.splitext(video_path)[1].lower()
+        if ext in {".jpg", ".jpeg", ".png", ".webp", ".bmp"}:
+            img = cv2.imread(video_path)
+            if img is not None:
+                rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                return [rgb.copy() for _ in range(self.num_frames)]
+
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
+            # Try reading as static image
+            img = cv2.imread(video_path)
+            if img is not None:
+                rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                return [rgb.copy() for _ in range(self.num_frames)]
             raise RuntimeError(f"Could not open video file: {video_path}")
 
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         if total_frames <= 0:
+            img = cv2.imread(video_path)
+            if img is not None:
+                cap.release()
+                rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                return [rgb.copy() for _ in range(self.num_frames)]
             cap.release()
             raise RuntimeError(f"Video has 0 frames: {video_path}")
 

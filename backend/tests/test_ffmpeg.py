@@ -8,8 +8,14 @@ from app.adapters.image.local_image_adapter import LocalImageAdapter
 from app.adapters.video.opencv_video_adapter import OpenCVVideoAdapter
 from app.utils.media_check import validate_video_file
 
+pytestmark = pytest.mark.skipif(
+    shutil.which("ffmpeg") is None,
+    reason="FFmpeg binary not installed in local environment"
+)
+
 def test_ffmpeg_installed():
     assert shutil.which("ffmpeg") is not None, "FFmpeg binary must be installed and accessible in PATH"
+
 
 @pytest.mark.asyncio
 async def test_ffmpeg_assembly_pipeline(tmp_path):

@@ -697,14 +697,143 @@ select:focus, input:focus {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 8px;
+    margin-bottom: 8px;
+}
+
+.reference-url-box {
+    margin-top: 6px;
+    margin-bottom: 8px;
+}
+
+.url-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
 }
 
 .reference-url-input {
+    flex: 1;
     min-height: 42px;
     height: 42px;
     padding: 8px 12px;
     resize: none;
+    font-size: 0.85rem;
 }
+
+.process-url-btn {
+    white-space: nowrap;
+    padding: 10px 16px;
+    background: var(--brand-primary);
+    color: #fff;
+    border-color: var(--brand-primary);
+    font-weight: 600;
+}
+
+.process-url-btn:hover {
+    background: var(--brand-primary-hover, #4f46e5);
+    color: #fff;
+}
+
+/* Reference Preview Card */
+.reference-preview-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg-surface-elevated, #181926);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius-md);
+    margin: 8px 0;
+    transition: all var(--transition-fast);
+}
+
+.reference-preview-card:hover {
+    border-color: var(--border-card-hover);
+}
+
+.preview-thumb-container {
+    width: 64px;
+    height: 44px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: #090a10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 1px solid var(--border-subtle);
+}
+
+.preview-thumb-media {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.preview-info-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.preview-title-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.preview-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: var(--radius-xs, 4px);
+    background: rgba(99, 102, 241, 0.2);
+    color: #a5b4fc;
+}
+
+.preview-source-badge {
+    font-size: 0.68rem;
+    padding: 2px 6px;
+    border-radius: var(--radius-xs, 4px);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+}
+
+.preview-filename {
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.preview-dim {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+
+.preview-clear-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-xs);
+    transition: all var(--transition-fast);
+}
+
+.preview-clear-btn:hover {
+    color: var(--danger-color, #ef4444);
+    background: rgba(239, 68, 68, 0.1);
+}
+
 
 /* Advanced Collapsible Accordion */
 .advanced-accordion {

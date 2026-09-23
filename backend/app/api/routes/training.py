@@ -1,0 +1,227 @@
+"""Training and Fine-Tuning API routes with full Reference workflow support."""
+from __future__ import annotations
+
+import asyncio
+import os
+import uuid
+from typing import Dict, Any, Optional, List
+from pathlib import Path
+from fastapi import APIRouter, HTTPException
+
+from app.schemas.request import TrainingSessionRequest
+from app.schemas.response import TrainingSessionResponse
+from app.services.reference_service import reference_service
+from app.core.config import settings
+from app.core.logging import telemetry, logger
+from app.core.exceptions import ValidationError
+
+from training.datasets.manifest_builder import build_manifest_from_directory, prepare_reference_dataset_entry
+from training.fine_tuning.model import SpatialTemporalTTVModel
+from training.fine_tuning.trainer import TTVTrainer
+from training.datasets.loader import create_dataloader
+
+router = APIRouter()
+
+# In-memory training sessions registry
+_TRAINING_SESSIONS: Dict[str, Dict[str, Any]] = {}
+
+
+async def _execute_training_job(
+    job_id: str,
+    base_model_name: str,
+    method: str,
+    epochs: int,
+    learning_rate: float,
+    batch_size: int,
+    reference_id: Optional[str],
+    manifest_path: str,
+    version_name: str,
+):
+    session = _TRAINING_SESSIONS.get(job_id)
+    if not session:
+        return
+
+    try:
+        session["status"] = "running"
+        session["logs"].append(f"[Worker] Initializing {method.upper()} fine-tuning for {base_model_name}...")
+        
+        # 1. Check & prepare DataLoader
+        manifest_p = Path(manifest_path)
+        if not manifest_p.exists():
+            session["logs"].append(f"[Dataset] Manifest {manifest_path} not found. Automatically building from generated/videos...")
+            build_manifest_from_directory(
+                videos_dir=str(settings.get_absolute_path("generated/videos")),
+                output_manifest_path=str(manifest_p)
+            )
+
+        session["logs"].append(f"[Dataset] Loaded dataset manifest from {manifest_path}.")
+        
+        train_loader = create_dataloader(
+            manifest_path=str(manifest_p),
+            batch_size=max(1, batch_size),
+            num_frames=8,
+            height=128,
+            width=128,
+            shuffle=True
+        )
+        val_loader = create_dataloader(
+            manifest_path=str(manifest_p),
+            batch_size=max(1, batch_size),
+            num_frames=8,
+            height=128,
+            width=128,
+            shuffle=False
+        )
+
+        # 2. Instantiate SpatialTemporalTTVModel
+        model = SpatialTemporalTTVModel(
+            in_channels=3,
+            latent_channels=64,
+            num_frames=8,
+            vocab_size=10000,
+            max_prompt_length=32,
+            text_embed_dim=128
+        )
+
+        # 3. Configure Trainer
+        train_cfg = {
+            "learning_rate": learning_rate,
+            "epochs": epochs,
+            "use_lora": (method == "lora"),
+            "lora_rank": 8 if method == "lora" else 4,
+            "lora_alpha": 16.0 if method == "lora" else 8.0,
+            "device": "cpu"
+        }
+        
+        ckpt_dir = str(settings.get_absolute_path("training/checkpoints"))
+        trainer = TTVTrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            config=train_cfg,
+            checkpoint_dir=ckpt_dir
+        )
+
+        session["logs"].append(f"[Trainer] Model initialized. Trainable parameters: {trainer.trainable_params_count:,} / {trainer.total_params_count:,}")
+        session["logs"].append(f"[Training] Running {epochs} epoch(s)...")
+
+        # Run training loop asynchronously
+        results = await asyncio.to_thread(trainer.train)
+
+        session["status"] = "completed"
+        session["result"] = results
+        session["logs"].append(f"[Complete] Training finished successfully! Final loss: {results.get('best_val_loss', 0.0):.4f}")
+        session["logs"].append(f"[Checkpoint] Checkpoint saved at {results.get('final_checkpoint')}")
+
+    except Exception as exc:
+        logger.exception(f"Training session {job_id} failed: {exc}")
+        session["status"] = "failed"
+        session["error"] = str(exc)
+        session["logs"].append(f"[Error] Training failed: {exc}")
+
+
+@router.post("/start", response_model=TrainingSessionResponse)
+async def start_training_session(request: TrainingSessionRequest):
+    """
+    Launch a model training or fine-tuning session, incorporating reference media
+    if provided.
+    """
+    job_id = f"train_{uuid.uuid4().hex[:10]}"
+    logs: List[str] = [
+        f"[Session] Created training job {job_id}",
+        f"[Config] Method={request.method}, Epochs={request.epochs}, LR={request.learning_rate}, BatchSize={request.batch_size}"
+    ]
+
+    ref_payload = None
+    manifest_path = request.dataset_manifest or "training/datasets/dataset.jsonl"
+    abs_manifest = settings.get_absolute_path(manifest_path)
+
+    # 1. Resolve and integrate reference if supplied
+    if request.reference_id or request.reference_url:
+        try:
+            ref_payload = await reference_service.resolve(
+                reference_url=request.reference_url,
+                reference_id=request.reference_id,
+                reference_type=request.reference_type
+            )
+            if ref_payload:
+                logs.append(
+                    f"[Reference] Attached reference {ref_payload['reference_id']} "
+                    f"({ref_payload['media_type']}, {ref_payload['width']}x{ref_payload['height']}, source={ref_payload['source']})"
+                )
+                # Prepare and insert reference into training dataset
+                ref_manifest_path = str(settings.get_absolute_path("training/datasets/reference_train_manifest.jsonl"))
+                sample_entry = prepare_reference_dataset_entry(
+                    ref_payload,
+                    output_manifest_path=ref_manifest_path
+                )
+                manifest_path = ref_manifest_path
+                logs.append(f"[Dataset] Augmented training dataset with reference sample: {sample_entry.get('id')}")
+        except Exception as e:
+            raise ValidationError(f"Could not process reference for training: {e}")
+
+    # 2. Parse hyperparameters
+    try:
+        lr_float = float(request.learning_rate)
+    except (ValueError, TypeError):
+        lr_float = 0.0001
+
+    epochs_val = int(request.epochs or 10)
+    batch_size_val = int(request.batch_size or 2)
+
+    # 3. Register session
+    _TRAINING_SESSIONS[job_id] = {
+        "job_id": job_id,
+        "status": "queued",
+        "reference_id": ref_payload.get("reference_id") if ref_payload else None,
+        "reference_info": ref_payload,
+        "config": request.model_dump(),
+        "logs": logs,
+        "result": None,
+        "error": None
+    }
+
+    # 4. Launch background training runner
+    asyncio.create_task(
+        _execute_training_job(
+            job_id=job_id,
+            base_model_name=request.base_model or "SpatialTemporalTTVModel",
+            method=request.method or "lora",
+            epochs=epochs_val,
+            learning_rate=lr_float,
+            batch_size=batch_size_val,
+            reference_id=ref_payload.get("reference_id") if ref_payload else None,
+            manifest_path=manifest_path,
+            version_name=request.version_name or "ttv_lora_v001"
+        )
+    )
+
+    return TrainingSessionResponse(
+        job_id=job_id,
+        status="running",
+        message="Training session launched successfully",
+        reference_id=ref_payload.get("reference_id") if ref_payload else None,
+        reference_info=ref_payload,
+        config=request.model_dump(),
+        logs=logs
+    )
+
+
+@router.get("/status/{job_id}", response_model=TrainingSessionResponse)
+async def get_training_status(job_id: str):
+    """
+    Get live progress, metrics, and terminal log outputs for a training session.
+    """
+    session = _TRAINING_SESSIONS.get(job_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Training job not found")
+
+    return TrainingSessionResponse(
+        job_id=job_id,
+        status=session.get("status", "running"),
+        message=f"Training session is {session.get('status')}",
+        reference_id=session.get("reference_id"),
+        reference_info=session.get("reference_info"),
+        config=session.get("config"),
+        logs=session.get("logs", [])
+    )

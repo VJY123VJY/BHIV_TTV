@@ -49,6 +49,8 @@ generated/images/*
 generated/scenes/*
 generated/audio/*
 generated/videos/*
+generated/references/*
+generated/temp/*
 !generated/**/.gitkeep
 
 # IDE

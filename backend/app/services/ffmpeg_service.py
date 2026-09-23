@@ -64,13 +64,30 @@ class FFmpegService:
             output_path
         ]
 
-        telemetry.emit("ffmpeg_assembly_started", execution_id, {
-            "output_path": output_path,
-            "width": width,
-            "height": height,
-            "fps": fps,
-        })
-        
+        import shutil
+        import cv2
+
+        if not shutil.which("ffmpeg"):
+            # Fallback to OpenCV compositor when FFmpeg is not installed in the local environment
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(output_path, fourcc, float(fps), (width, height))
+            for scene in scenes:
+                if not scene.video_path or not os.path.exists(scene.video_path):
+                    continue
+                cap = cv2.VideoCapture(scene.video_path)
+                while cap.isOpened():
+                    ret, frame = cap.read()
+                    if not ret or frame is None:
+                        break
+                    if frame.shape[1] != width or frame.shape[0] != height:
+                        frame = cv2.resize(frame, (width, height), interpolation=cv2.INTER_LANCZOS4)
+                    out.write(frame)
+                cap.release()
+            out.release()
+            is_valid, info = validate_video_file(output_path)
+            telemetry.emit("ffmpeg_assembly_completed", execution_id, info)
+            return output_path
+
         try:
             subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
         except subprocess.CalledProcessError as e:

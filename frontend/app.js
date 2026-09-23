@@ -385,62 +385,246 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     updateOutputReadout();
 
-    function setReferenceStatus(text) {
-        if (referenceStatus) referenceStatus.textContent = text;
-    }
+    // =========================================================================
+    // 6b. UNIFIED REUSABLE REFERENCE CONTROLLER
+    // =========================================================================
+    function initReferenceWorkflow(cfg) {
+        const state = {
+            referenceId: null,
+            referenceType: null,
+            referenceUrl: null,
+            payload: null
+        };
 
-    async function uploadReferenceFile(file, hintedType) {
-        const form = new FormData();
-        form.append("file", file);
-        if (hintedType) form.append("reference_type", hintedType);
-        const res = await fetch("/api/v1/references/upload", { method: "POST", body: form });
-        if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.message || errData.detail || "Reference upload failed");
+        const uploadImgBtn = document.getElementById(cfg.uploadImageBtnId);
+        const uploadVidBtn = document.getElementById(cfg.uploadVideoBtnId);
+        const pasteBtn = document.getElementById(cfg.pasteLinkBtnId);
+        const imgInput = document.getElementById(cfg.imageInputId);
+        const vidInput = document.getElementById(cfg.videoInputId);
+        const urlBox = document.getElementById(cfg.urlBoxId);
+        const urlInput = document.getElementById(cfg.urlInputId);
+        const processBtn = document.getElementById(cfg.processUrlBtnId);
+        const previewCard = document.getElementById(cfg.previewCardId);
+        const previewImg = document.getElementById(cfg.previewImgId);
+        const previewVid = document.getElementById(cfg.previewVideoId);
+        const typeBadge = document.getElementById(cfg.typeBadgeId);
+        const sourceBadge = document.getElementById(cfg.sourceBadgeId);
+        const filenameEl = document.getElementById(cfg.filenameId);
+        const dimEl = document.getElementById(cfg.dimensionsId);
+        const clearBtn = document.getElementById(cfg.clearBtnId);
+        const statusEl = document.getElementById(cfg.statusId);
+
+        function setStatus(text) {
+            if (statusEl) statusEl.textContent = text;
         }
-        const data = await res.json();
-        referenceId = data.reference_id;
-        referenceType = data.media_type;
-        if (referenceUrlInput) referenceUrlInput.value = "";
-        setReferenceStatus(`Uploaded ${data.media_type}: ${file.name}`);
-        showToast("Reference uploaded.");
+
+        function showPreview(data, displayName) {
+            if (!previewCard) return;
+            previewCard.classList.remove("hidden");
+            if (typeBadge) typeBadge.textContent = (data.media_type || "Media").toUpperCase();
+            if (sourceBadge) sourceBadge.textContent = data.source || "upload";
+            if (filenameEl) filenameEl.textContent = displayName || data.filename || data.reference_id || "Reference Media";
+            if (dimEl) dimEl.textContent = `${data.width || 1280} × ${data.height || 720}${data.duration ? " • " + data.duration + "s" : ""}`;
+
+            const previewSrc = data.preview_url || data.still_path || data.path;
+            if (data.media_type === "video" && !data.still_path && previewVid) {
+                previewVid.src = previewSrc;
+                previewVid.classList.remove("hidden");
+                if (previewImg) previewImg.classList.add("hidden");
+            } else if (previewImg && previewSrc) {
+                previewImg.src = previewSrc;
+                previewImg.classList.remove("hidden");
+                if (previewVid) previewVid.classList.add("hidden");
+            }
+        }
+
+        function clearReference(notify = true) {
+            state.referenceId = null;
+            state.referenceType = null;
+            state.referenceUrl = null;
+            state.payload = null;
+
+            if (imgInput) imgInput.value = "";
+            if (vidInput) vidInput.value = "";
+            if (urlInput) urlInput.value = "";
+            if (previewCard) previewCard.classList.add("hidden");
+            if (previewImg) { previewImg.src = ""; previewImg.classList.add("hidden"); }
+            if (previewVid) { previewVid.src = ""; previewVid.classList.add("hidden"); }
+            setStatus("No reference selected");
+
+            if (cfg.onReferenceChange) cfg.onReferenceChange(state);
+            if (notify) showToast("Reference removed.");
+        }
+
+        async function uploadFile(file, hintedType) {
+            setStatus(`Uploading ${hintedType}...`);
+            const form = new FormData();
+            form.append("file", file);
+            if (hintedType) form.append("reference_type", hintedType);
+
+            const res = await fetch("/api/v1/references/upload", { method: "POST", body: form });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.message || errData.detail || "Reference upload failed");
+            }
+            const data = await res.json();
+            state.referenceId = data.reference_id;
+            state.referenceType = data.media_type;
+            state.referenceUrl = null;
+            state.payload = data;
+
+            if (urlBox) urlBox.classList.add("hidden");
+            showPreview(data, file.name);
+            setStatus(`Uploaded ${data.media_type}: ${file.name}`);
+            showToast(`Reference ${data.media_type} uploaded successfully.`);
+            if (cfg.onReferenceChange) cfg.onReferenceChange(state);
+        }
+
+        async function processUrl() {
+            if (!urlInput) return;
+            const url = urlInput.value.trim();
+            if (!url) {
+                showToast("Please enter a reference URL.", "error");
+                return;
+            }
+
+            setStatus("Processing reference link...");
+            if (processBtn) {
+                processBtn.disabled = true;
+                processBtn.textContent = "Processing...";
+            }
+
+            try {
+                const res = await fetch("/api/v1/references/url", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url })
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.message || errData.detail || "This reference link cannot be processed. Please provide a publicly accessible image/video URL or upload the file directly.");
+                }
+
+                const data = await res.json();
+                state.referenceId = data.reference_id;
+                state.referenceType = data.media_type;
+                state.referenceUrl = url;
+                state.payload = data;
+
+                showPreview(data, `${data.source.toUpperCase()} Reference`);
+                setStatus(`Processed ${data.media_type} from ${data.source}`);
+                showToast("Reference link processed successfully!");
+                if (cfg.onReferenceChange) cfg.onReferenceChange(state);
+            } catch (err) {
+                setStatus(`Failed: ${err.message}`);
+                showToast(err.message, "error", 5000);
+            } finally {
+                if (processBtn) {
+                    processBtn.disabled = false;
+                    processBtn.textContent = "Process Reference";
+                }
+            }
+        }
+
+        if (uploadImgBtn) uploadImgBtn.addEventListener("click", () => imgInput && imgInput.click());
+        if (uploadVidBtn) uploadVidBtn.addEventListener("click", () => vidInput && vidInput.click());
+        if (pasteBtn && urlBox) {
+            pasteBtn.addEventListener("click", () => {
+                urlBox.classList.toggle("hidden");
+                if (!urlBox.classList.contains("hidden") && urlInput) urlInput.focus();
+            });
+        }
+        if (imgInput) {
+            imgInput.addEventListener("change", async () => {
+                const file = imgInput.files && imgInput.files[0];
+                if (!file) return;
+                try { await uploadFile(file, "image"); }
+                catch (err) { setStatus(`Upload failed: ${err.message}`); showToast(err.message, "error"); }
+            });
+        }
+        if (vidInput) {
+            vidInput.addEventListener("change", async () => {
+                const file = vidInput.files && vidInput.files[0];
+                if (!file) return;
+                try { await uploadFile(file, "video"); }
+                catch (err) { setStatus(`Upload failed: ${err.message}`); showToast(err.message, "error"); }
+            });
+        }
+        if (processBtn) {
+            processBtn.addEventListener("click", processUrl);
+        }
+        if (urlInput) {
+            urlInput.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    processUrl();
+                }
+            });
+        }
+        if (clearBtn) {
+            clearBtn.addEventListener("click", () => clearReference(true));
+        }
+
+        return {
+            getState: () => state,
+            clear: clearReference
+        };
     }
 
-    if (uploadImageBtn) uploadImageBtn.addEventListener("click", () => referenceImageInput && referenceImageInput.click());
-    if (uploadVideoBtn) uploadVideoBtn.addEventListener("click", () => referenceVideoInput && referenceVideoInput.click());
-    if (pasteLinkBtn && referenceUrlInput) {
-        pasteLinkBtn.addEventListener("click", () => {
-            referenceUrlInput.classList.toggle("hidden");
-            referenceUrlInput.focus();
-        });
-    }
-    if (referenceImageInput) {
-        referenceImageInput.addEventListener("change", async () => {
-            const file = referenceImageInput.files && referenceImageInput.files[0];
-            if (!file) return;
-            try { await uploadReferenceFile(file, "image"); }
-            catch (err) { showToast(err.message, "error"); }
-        });
-    }
-    if (referenceVideoInput) {
-        referenceVideoInput.addEventListener("change", async () => {
-            const file = referenceVideoInput.files && referenceVideoInput.files[0];
-            if (!file) return;
-            try { await uploadReferenceFile(file, "video"); }
-            catch (err) { showToast(err.message, "error"); }
-        });
-    }
-    if (referenceUrlInput) {
-        referenceUrlInput.addEventListener("input", () => {
-            if (referenceUrlInput.value.trim()) {
-                referenceId = null;
-                referenceType = null;
-                setReferenceStatus("Reference URL ready");
-            } else if (!referenceId) {
-                setReferenceStatus("No reference selected");
-            }
-        });
-    }
+    // Initialize New Generation Reference Workflow
+    const genRefController = initReferenceWorkflow({
+        uploadImageBtnId: "upload-image-btn",
+        uploadVideoBtnId: "upload-video-btn",
+        pasteLinkBtnId: "paste-link-btn",
+        imageInputId: "reference-image-input",
+        videoInputId: "reference-video-input",
+        urlBoxId: "reference-url-box",
+        urlInputId: "reference-url-input",
+        processUrlBtnId: "process-link-btn",
+        previewCardId: "reference-preview-card",
+        previewImgId: "reference-preview-img",
+        previewVideoId: "reference-preview-video",
+        typeBadgeId: "reference-type-badge",
+        sourceBadgeId: "reference-source-badge",
+        filenameId: "reference-filename",
+        dimensionsId: "reference-dimensions",
+        clearBtnId: "reference-clear-btn",
+        statusId: "reference-status",
+        onReferenceChange: (refState) => {
+            referenceId = refState.referenceId;
+            referenceType = refState.referenceType;
+        }
+    });
+
+    // Initialize Training / Fine-Tuning Reference Workflow
+    let trainReferenceState = { referenceId: null, referenceType: null, referenceUrl: null };
+    const trainRefController = initReferenceWorkflow({
+        uploadImageBtnId: "train-upload-image-btn",
+        uploadVideoBtnId: "train-upload-video-btn",
+        pasteLinkBtnId: "train-paste-link-btn",
+        imageInputId: "train-reference-image-input",
+        videoInputId: "train-reference-video-input",
+        urlBoxId: "train-reference-url-box",
+        urlInputId: "train-reference-url-input",
+        processUrlBtnId: "train-process-link-btn",
+        previewCardId: "train-reference-preview-card",
+        previewImgId: "train-reference-preview-img",
+        previewVideoId: "train-reference-preview-video",
+        typeBadgeId: "train-reference-type-badge",
+        sourceBadgeId: "train-reference-source-badge",
+        filenameId: "train-reference-filename",
+        dimensionsId: "train-reference-dimensions",
+        clearBtnId: "train-reference-clear-btn",
+        statusId: "train-reference-status",
+        onReferenceChange: (refState) => {
+            trainReferenceState = {
+                referenceId: refState.referenceId,
+                referenceType: refState.referenceType,
+                referenceUrl: refState.referenceUrl
+            };
+        }
+    });
 
     randomizeSeedBtn.addEventListener("click", () => {
         const randomSeed = Math.floor(Math.random() * 1000000);
@@ -956,27 +1140,97 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (startTrainingBtn) {
-        startTrainingBtn.addEventListener("click", () => {
-            const epochs = document.getElementById("train-epochs").value;
-            const lr = document.getElementById("train-lr").value;
-            const batchSize = document.getElementById("train-batch-size").value;
-            const method = document.getElementById("train-method").value;
+        startTrainingBtn.addEventListener("click", async () => {
+            const epochs = parseInt(document.getElementById("train-epochs")?.value || "10", 10);
+            const lr = document.getElementById("train-lr")?.value || "0.0001";
+            const batchSize = parseInt(document.getElementById("train-batch-size")?.value || "2", 10);
+            const method = document.getElementById("train-method")?.value || "lora";
+            const baseModel = document.getElementById("train-base-model")?.value || "SpatialTemporalTTVModel";
 
+            startTrainingBtn.disabled = true;
             trainingSessionStatus.textContent = "Session Active";
             trainingSessionStatus.className = "badge badge-success";
 
-            const logLine = document.createElement("div");
-            logLine.className = "log-line text-accent";
-            logLine.textContent = `[Launch] Initializing Fine-Tuning: method=${method}, epochs=${epochs}, lr=${lr}, batch=${batchSize}`;
-            trainingTerminalLog.appendChild(logLine);
+            function appendLog(text, cssClass = "text-muted") {
+                if (!trainingTerminalLog) return;
+                const logLine = document.createElement("div");
+                logLine.className = `log-line ${cssClass}`;
+                logLine.textContent = text;
+                trainingTerminalLog.appendChild(logLine);
+                trainingTerminalLog.scrollTop = trainingTerminalLog.scrollHeight;
+            }
 
-            const cliLine = document.createElement("div");
-            cliLine.className = "log-line text-muted";
-            cliLine.textContent = `[Worker] Run training process via terminal: python training/run_training.py --config training/configs/smoke_test.yaml`;
-            trainingTerminalLog.appendChild(cliLine);
-            trainingTerminalLog.scrollTop = trainingTerminalLog.scrollHeight;
+            appendLog(`[Launch] Initializing Fine-Tuning: method=${method}, epochs=${epochs}, lr=${lr}, batch=${batchSize}`, "text-accent");
+            if (trainReferenceState.referenceId || trainReferenceState.referenceUrl) {
+                appendLog(`[Reference] Attached reference: id=${trainReferenceState.referenceId || "none"}, url=${trainReferenceState.referenceUrl || "none"}, type=${trainReferenceState.referenceType || "auto"}`, "text-accent");
+                appendLog(`[Dataset] Ingesting reference into model training pipeline...`, "text-muted");
+            }
 
-            showToast("Training session dispatched. Inspect worker terminal log for details.", "success", 4000);
+            try {
+                const payload = {
+                    base_model: baseModel,
+                    method: method,
+                    epochs: epochs,
+                    learning_rate: lr,
+                    batch_size: batchSize,
+                    reference_id: trainReferenceState.referenceId,
+                    reference_url: trainReferenceState.referenceUrl,
+                    reference_type: trainReferenceState.referenceType
+                };
+
+                const res = await fetch("/api/v1/training/start", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.message || errData.detail || "Failed to start training session");
+                }
+
+                const data = await res.json();
+                if (Array.isArray(data.logs)) {
+                    data.logs.forEach(l => appendLog(l, "text-muted"));
+                }
+
+                showToast("Training session launched with reference!", "success", 4000);
+
+                // Poll for training job updates
+                const pollTimer = setInterval(async () => {
+                    try {
+                        const statusRes = await fetch(`/api/v1/training/status/${data.job_id}`);
+                        if (!statusRes.ok) return;
+                        const statusData = await statusRes.json();
+                        if (statusData.status === "completed") {
+                            clearInterval(pollTimer);
+                            startTrainingBtn.disabled = false;
+                            trainingSessionStatus.textContent = "Completed";
+                            trainingSessionStatus.className = "badge badge-success";
+                            if (Array.isArray(statusData.logs)) {
+                                statusData.logs.slice(data.logs.length).forEach(l => appendLog(l, "text-accent"));
+                            }
+                            showToast("Training session completed successfully!", "success", 5000);
+                        } else if (statusData.status === "failed") {
+                            clearInterval(pollTimer);
+                            startTrainingBtn.disabled = false;
+                            trainingSessionStatus.textContent = "Failed";
+                            trainingSessionStatus.className = "badge badge-danger";
+                            appendLog(`[Error] Training job failed.`, "text-accent");
+                            showToast("Training job encountered an error.", "error", 5000);
+                        }
+                    } catch (e) {
+                        // ignore network blips during polling
+                    }
+                }, 1500);
+
+            } catch (err) {
+                appendLog(`[Error] ${err.message}`, "text-accent");
+                trainingSessionStatus.textContent = "Failed";
+                trainingSessionStatus.className = "badge badge-danger";
+                startTrainingBtn.disabled = false;
+                showToast(err.message, "error", 5000);
+            }
         });
     }
 

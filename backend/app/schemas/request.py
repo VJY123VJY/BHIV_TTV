@@ -155,6 +155,7 @@ class GenerationRequest(BaseModel):
         return self
 
     model_config = {
+        "protected_namespaces": (),
         "json_schema_extra": {
             "example": {
                 "prompt": "A farmer walking through a green vegetable farm",
@@ -170,3 +171,44 @@ class GenerationRequest(BaseModel):
             }
         }
     }
+
+
+class ReferenceProcessRequest(BaseModel):
+    url: str = Field(..., min_length=1, max_length=2048, description="Public reference media URL")
+    reference_type: Optional[str] = Field(default=None, description="Optional hint: image or video")
+
+    @field_validator("reference_type")
+    @classmethod
+    def _validate_ref_type(cls, value):
+        if value in (None, "", "none"):
+            return None
+        key = str(value).strip().lower()
+        if key not in {"image", "video"}:
+            raise ValueError("reference_type must be 'image' or 'video'.")
+        return key
+
+    @field_validator("url")
+    @classmethod
+    def _validate_url(cls, value):
+        if not value or not str(value).strip():
+            raise ValueError("Reference URL cannot be empty.")
+        safe, _ = validate_public_url(value, resolve_dns=False)
+        return safe
+
+
+class TrainingSessionRequest(BaseModel):
+    base_model: Optional[str] = Field(default="SpatialTemporalTTVModel", description="Base model name or path")
+    method: Optional[str] = Field(default="lora", description="Fine-tuning method (lora, full, temporal_only)")
+    epochs: Optional[int] = Field(default=10, ge=1, le=100, description="Number of training epochs")
+    learning_rate: Optional[str] = Field(default="0.0001", description="Training learning rate")
+    batch_size: Optional[int] = Field(default=2, ge=1, le=16, description="Batch size")
+    reference_id: Optional[str] = Field(default=None, description="Reference identifier")
+    reference_url: Optional[str] = Field(default=None, description="Public reference media URL")
+    reference_type: Optional[str] = Field(default=None, description="Optional hint: image or video")
+    dataset_manifest: Optional[str] = Field(default=None, description="Optional path to custom dataset manifest")
+    version_name: Optional[str] = Field(default="ttv_lora_v001", description="Model version tag")
+
+    model_config = {
+        "protected_namespaces": ()
+    }
+

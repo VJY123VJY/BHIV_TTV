@@ -69,4 +69,31 @@ class ReferenceUploadResponse(BaseModel):
     reference_id: str
     media_type: str
     source: str = "upload"
+    width: Optional[int] = None
+    height: Optional[int] = None
+    preview_url: Optional[str] = None
+    still_url: Optional[str] = None
+    status: str = "stored"
     message: str = "Reference stored successfully"
+
+
+class ReferenceDetailResponse(BaseModel):
+    reference_id: str
+    media_type: str
+    source: str
+    width: Optional[int] = None
+    height: Optional[int] = None
+    path: Optional[str] = None
+    preview_url: Optional[str] = None
+    message: str = "Reference retrieved successfully"
+
+
+class TrainingSessionResponse(BaseModel):
+    job_id: str
+    status: str
+    message: str
+    reference_id: Optional[str] = None
+    reference_info: Optional[Dict[str, Any]] = None
+    config: Optional[Dict[str, Any]] = None
+    logs: List[str] = []
+

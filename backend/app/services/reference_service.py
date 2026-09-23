@@ -52,6 +52,11 @@ class ReferenceService:
         dest_path = dest_dir / f"source{ext}"
         dest_path.write_bytes(content)
         media_type = "image" if ext in ALLOWED_IMAGE_EXT else "video"
+        if media_type == "video":
+            try:
+                self.extract_still(str(dest_path), media_type, ref_id)
+            except Exception:
+                pass
         payload = self._describe(str(dest_path), media_type, source="upload", reference_id=ref_id)
         telemetry.emit("reference_uploaded", ref_id, {"media_type": media_type, "bytes": len(content)})
         return payload
@@ -63,6 +68,11 @@ class ReferenceService:
         os.makedirs(dest_dir, exist_ok=True)
         adapter = get_reference_adapter(safe_url)
         retrieved = await adapter.retrieve(safe_url, dest_dir)
+        if retrieved["media_type"] == "video":
+            try:
+                self.extract_still(retrieved["path"], retrieved["media_type"], ref_id)
+            except Exception:
+                pass
         payload = self._describe(
             retrieved["path"],
             retrieved["media_type"],
@@ -108,6 +118,8 @@ class ReferenceService:
         if media_type == "image":
             return media_path
         dest = str(self.root / reference_id / "still.jpg")
+        if os.path.exists(dest):
+            return dest
         cap = cv2.VideoCapture(media_path)
         ok, frame = cap.read()
         cap.release()
@@ -118,22 +130,50 @@ class ReferenceService:
 
     def _describe(self, path: str, media_type: str, source: str, reference_id: str) -> Dict[str, Any]:
         width = height = None
+        duration = 0.0
+        fps = 24
         if media_type == "image":
-            with Image.open(path) as img:
-                width, height = img.size
+            try:
+                with Image.open(path) as img:
+                    width, height = img.size
+            except Exception:
+                pass
         else:
-            cap = cv2.VideoCapture(path)
-            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0) or None
-            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0) or None
-            cap.release()
+            try:
+                cap = cv2.VideoCapture(path)
+                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0) or None
+                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0) or None
+                fps_cap = float(cap.get(cv2.CAP_PROP_FPS) or 24.0)
+                fps = int(fps_cap) if fps_cap > 0 else 24
+                frame_count = float(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+                duration = round(frame_count / max(1.0, fps_cap), 2) if frame_count > 0 else 5.0
+                cap.release()
+            except Exception:
+                pass
+
+        fname = os.path.basename(path)
+        still_file = self.root / reference_id / "still.jpg"
+        if still_file.exists():
+            preview_url = f"/generated/references/{reference_id}/still.jpg"
+            still_path = str(still_file)
+        else:
+            preview_url = f"/generated/references/{reference_id}/{fname}"
+            still_path = path if media_type == "image" else None
+
         return {
             "reference_id": reference_id,
             "path": path,
             "media_type": media_type,
             "source": source,
-            "width": width,
-            "height": height,
+            "filename": fname,
+            "width": width or 1280,
+            "height": height or 720,
+            "duration": duration,
+            "fps": fps,
+            "still_path": still_path,
+            "preview_url": preview_url,
         }
+
 
     def cleanup(self, reference_id: Optional[str]) -> None:
         if not reference_id:

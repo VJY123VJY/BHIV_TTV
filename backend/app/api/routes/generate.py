@@ -2,8 +2,13 @@ import asyncio
 from fastapi import APIRouter, UploadFile, File, Form
 from typing import Optional
 
-from app.schemas.request import GenerationRequest, SUPPORTED_STYLES
-from app.schemas.response import GenerationResponse, GenerationSettings, ReferenceUploadResponse
+from app.schemas.request import GenerationRequest, ReferenceProcessRequest, SUPPORTED_STYLES
+from app.schemas.response import (
+    GenerationResponse,
+    GenerationSettings,
+    ReferenceUploadResponse,
+    ReferenceDetailResponse,
+)
 from app.core.queue import job_manager
 from app.pipelines.text_to_video import pipeline
 from app.utils.hashing import generate_execution_id
@@ -103,7 +108,51 @@ async def upload_reference(
         reference_id=payload["reference_id"],
         media_type=payload["media_type"],
         source="upload",
+        width=payload.get("width"),
+        height=payload.get("height"),
+        preview_url=payload.get("preview_url"),
+        still_url=payload.get("still_path") or payload.get("preview_url"),
+        status="stored",
+        message="Reference uploaded successfully",
     )
+
+
+@router.post("/references/url", response_model=ReferenceDetailResponse)
+@router.post("/references/process", response_model=ReferenceDetailResponse)
+async def process_reference_url(request: ReferenceProcessRequest):
+    """
+    Ingest and process a public reference media URL (YouTube, Instagram, Facebook, X, or Direct URL).
+    """
+    payload = await reference_service.ingest_url(request.url)
+    return ReferenceDetailResponse(
+        reference_id=payload["reference_id"],
+        media_type=payload["media_type"],
+        source=payload.get("source", "url"),
+        width=payload.get("width"),
+        height=payload.get("height"),
+        path=payload.get("path"),
+        preview_url=payload.get("preview_url"),
+        message="Reference URL processed successfully",
+    )
+
+
+@router.get("/references/{reference_id}", response_model=ReferenceDetailResponse)
+async def get_reference_details(reference_id: str):
+    """
+    Retrieve stored reference media metadata.
+    """
+    payload = reference_service.load_existing(reference_id)
+    return ReferenceDetailResponse(
+        reference_id=payload["reference_id"],
+        media_type=payload["media_type"],
+        source=payload.get("source", "upload"),
+        width=payload.get("width"),
+        height=payload.get("height"),
+        path=payload.get("path"),
+        preview_url=payload.get("preview_url"),
+        message="Reference retrieved successfully",
+    )
+
 
 
 @router.post("/generate", response_model=GenerationResponse)

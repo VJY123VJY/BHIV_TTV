@@ -108,6 +108,76 @@ def build_manifest_from_directory(
     return summary
 
 
+def prepare_reference_dataset_entry(
+    reference_payload: Dict[str, Any],
+    prompt: Optional[str] = None,
+    output_manifest_path: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Transforms an uploaded or URL-ingested reference media payload into a
+    valid training dataset sample and writes/appends it to a dataset manifest.
+    """
+    ref_id = reference_payload.get("reference_id", "ref_custom")
+    media_path = reference_payload.get("path") or reference_payload.get("still_path")
+    if not media_path or not os.path.exists(media_path):
+        raise FileNotFoundError(f"Reference media path does not exist: {media_path}")
+
+    media_type = reference_payload.get("media_type", "image")
+    derived_prompt = prompt or reference_payload.get("title") or f"Cinematic reference sequence for {ref_id}"
+
+    sample = {
+        "id": f"sample_{ref_id}",
+        "prompt": derived_prompt,
+        "video_path": str(Path(media_path).resolve()),
+        "duration": float(reference_payload.get("duration", 5.0) or 5.0),
+        "fps": int(reference_payload.get("fps", 24) or 24),
+        "resolution": f"{reference_payload.get('width', 1280)}x{reference_payload.get('height', 720)}",
+        "style": "reference",
+        "quality_score": 0.95,
+        "metadata": {
+            "source": reference_payload.get("source", "reference"),
+            "reference_id": ref_id,
+            "media_type": media_type,
+            "still_path": reference_payload.get("still_path"),
+            "preview_url": reference_payload.get("preview_url")
+        }
+    }
+
+    if output_manifest_path:
+        out_p = Path(output_manifest_path)
+        out_p.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Check if existing entries exist in target manifest or base manifest
+        existing_lines = []
+        if out_p.exists():
+            with open(out_p, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        existing_lines.append(line.strip())
+        else:
+            # Seed from main dataset.jsonl if available
+            base_p = out_p.parent / "dataset.jsonl"
+            if base_p.exists():
+                with open(base_p, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if line.strip():
+                            existing_lines.append(line.strip())
+
+        # Prepend the reference sample as priority training sample
+        sample_json = json.dumps(sample)
+        with open(out_p, "w", encoding="utf-8") as f:
+            f.write(sample_json + "\n")
+            for line in existing_lines:
+                try:
+                    parsed = json.loads(line)
+                    if parsed.get("id") != sample["id"]:
+                        f.write(line + "\n")
+                except Exception:
+                    pass
+
+    return sample
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Build TTV Training Dataset Manifest")
@@ -118,3 +188,4 @@ if __name__ == "__main__":
     result = build_manifest_from_directory(args.videos_dir, args.output)
     print("Manifest successfully built:")
     print(json.dumps(result, indent=2))
+
