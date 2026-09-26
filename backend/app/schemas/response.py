@@ -14,10 +14,14 @@ class SceneInfo(BaseModel):
 class VideoMetadata(BaseModel):
     video_id: str
     prompt: str
+    dialogue: Optional[str] = None
     duration: float
     resolution: str
+    aspect_ratio: Optional[str] = None
     fps: int
     style: str
+    visual_style: Optional[str] = None
+    language: Optional[str] = None
     voice_enabled: bool
     file_size_bytes: int
     video_url: str
@@ -30,7 +34,9 @@ class GenerationSettings(BaseModel):
     quality: str
     resolution: str
     style: str
+    visual_style: Optional[str] = None
     language: str
+    dialogue: Optional[str] = None
     fps: int
     lipsync: bool = True
     character_id: Optional[str] = None
@@ -55,6 +61,14 @@ class JobResponse(BaseModel):
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     settings: Optional[Dict[str, Any]] = None
+    aspect_ratio: Optional[str] = None
+    visual_style: Optional[str] = None
+    language: Optional[str] = None
+    reference_type: Optional[str] = None
+    reference_url: Optional[str] = None
+    tts_status: Optional[str] = None
+    video_status: Optional[str] = None
+    lip_sync_status: Optional[str] = None
 
 
 class HealthResponse(BaseModel):

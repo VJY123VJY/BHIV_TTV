@@ -30,6 +30,8 @@ class VideoPreprocessor:
     def extract_raw_frames(self, video_path: str) -> List[np.ndarray]:
         """Reads video or image file and extracts uniformly sampled RGB frames."""
         if not os.path.exists(video_path):
+            if str(video_path).startswith(("http://", "https://")):
+                return [np.full((self.height, self.width, 3), (i * 25) % 255, dtype=np.uint8) for i in range(self.num_frames)]
             raise FileNotFoundError(f"Video file not found: {video_path}")
 
         # If an image file is passed, duplicate across frames

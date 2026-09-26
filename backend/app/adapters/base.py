@@ -47,7 +47,7 @@ class BaseVideoAdapter(ABC):
         pass
 
 class BaseTTSAdapter(ABC):
-    """Abstract interface for voice and speech generation."""
+    """Abstract interface for voice and speech generation (TTSProvider)."""
     @abstractmethod
     async def synthesize_speech(
         self,
@@ -58,3 +58,25 @@ class BaseTTSAdapter(ABC):
     ) -> str:
         """Synthesize voice narration saved to output_path."""
         pass
+
+    async def generate_audio(
+        self,
+        text: str,
+        output_path: str,
+        voice: Optional[str] = None,
+        language: Optional[str] = None,
+    ) -> str:
+        """Synthesize voice narration saved to output_path (TTSProvider contract)."""
+        return await self.synthesize_speech(text, output_path, voice=voice, language=language)
+
+    def get_supported_languages(self) -> List[str]:
+        """Return list of supported language codes."""
+        from app.utils.languages import SUPPORTED_LANGUAGES
+        return list(SUPPORTED_LANGUAGES.keys())
+
+    def validate_language(self, language: Optional[str]) -> str:
+        """Validate and normalize language code."""
+        from app.utils.languages import normalize_language
+        return normalize_language(language)
+
+TTSProvider = BaseTTSAdapter

@@ -39,6 +39,9 @@ class ModelRegistry:
         self.models_root.mkdir(parents=True, exist_ok=True)
         (self.models_root / "base").mkdir(parents=True, exist_ok=True)
         (self.models_root / "lora").mkdir(parents=True, exist_ok=True)
+        (self.models_root / "experiments").mkdir(parents=True, exist_ok=True)
+        (self.models_root / "checkpoints").mkdir(parents=True, exist_ok=True)
+        (self.models_root / "production").mkdir(parents=True, exist_ok=True)
 
     def register_version(
         self,
@@ -56,6 +59,17 @@ class ModelRegistry:
 
         # Compute checksum
         weights_sha = compute_file_sha256(checkpoint_path) if checkpoint_path else ""
+
+        # Copy checkpoint weights to destination directory
+        if checkpoint_path and os.path.exists(checkpoint_path):
+            import shutil
+            dest_adapter = dest_dir / "adapter_weights.pt"
+            dest_final = dest_dir / "final_model.pt"
+            try:
+                shutil.copy2(checkpoint_path, dest_adapter)
+                shutil.copy2(checkpoint_path, dest_final)
+            except Exception as e:
+                print(f"[ModelRegistry] Warning copying checkpoint to {dest_dir}: {e}")
 
         manifest = {
             "version": version_name,

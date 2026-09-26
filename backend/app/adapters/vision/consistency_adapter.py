@@ -18,6 +18,8 @@ class VisualConsistencyAdapter(BaseVisionConsistencyAdapter):
         "fantasy": "epic fantasy world, magical ethereal glow, painted concept art, detailed matte painting, mystical wonder",
         "cartoon": "stylized cartoon illustration, bold outlines, saturated colors, expressive simplified shapes, animated feature look",
         "3d": "stylized 3D render, octane lighting, subsurface scattering, cinematic CGI, clean topology, Pixar-like materials",
+        "documentary": "documentary film look, authentic real-world cinematography, natural available light, sharp optical clarity, true-to-life color grading, broadcast journalism aesthetic",
+        "custom": "custom artistic look, signature color harmony, balanced exposure, atmospheric visual tone, polished production design",
     }
 
     def enrich_scene_prompts(

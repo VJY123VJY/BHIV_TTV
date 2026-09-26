@@ -23,6 +23,7 @@ from dataset.sources.archive_org import archive_org_source
 from dataset.sources.synthetic import synthetic_source
 from dataset.downloader import download_resumable, extension_for_url, DownloadError
 from dataset.video_processor import video_processor
+from dataset.registry import DatasetPolicyError, assert_candidate_allowed
 
 
 class DatasetPipeline:
@@ -105,8 +106,14 @@ class DatasetPipeline:
                 info = synthetic_source.generate_synthetic_image(cat, dest, index=i)
                 raw_candidates.append(info)
 
-        # Process each candidate through the quality & provenance pipeline
+        # Process each candidate through the quality & provenance pipeline.
+        # Only Wikimedia has API-level, per-file metadata sufficient for this
+        # automated path. Archive/NASA/local assets must arrive through the
+        # reviewed local-import command with a provenance attestation.
         for cand in raw_candidates:
+            if source not in {"wikimedia", "synthetic"}:
+                self._reject(cand.get("asset_id", "unknown"), "manual_review_required", source)
+                continue
             asset = self.process_candidate(
                 cand, query=query, license_filter=license_filter,
                 min_resolution=min_resolution, max_download_bytes=max_download_gb * 1024 ** 3,
@@ -124,7 +131,16 @@ class DatasetPipeline:
         src_url = cand.get("source_url", "")
         license_str = cand.get("license", "unknown")
 
-        # 1. License Check
+        # 1. License and provenance check. This happens before download so a
+        # public URL can never bypass the dataset registry.
+        if cand.get("source_name") != "internal-synthetic":
+            try:
+                assert_candidate_allowed(cand, "wikimedia_commons")
+            except DatasetPolicyError as exc:
+                self._reject(asset_id, "provenance_policy_failed", str(exc))
+                return None
+
+        # 2. License Check
         lic_info = verify_license(license_str)
         requested_license = (license_filter or "").strip().lower()
         matches_requested_license = not requested_license or requested_license in license_str.lower()
@@ -134,7 +150,7 @@ class DatasetPipeline:
             rej_path.write_text(json.dumps({"asset_id": asset_id, "reason": "unsupported_license", "details": lic_info.__dict__}))
             return None
 
-        # 2. Local asset file resolution (or download if remote)
+        # 3. Local asset file resolution (or download if remote)
         media_type = cand.get("media_type", "image")
         suffix = extension_for_url(cand.get("download_url") or src_url, media_type)
         local_path = cand.get("local_path") or str(self.raw_dir / f"{asset_id}{suffix}")
@@ -152,10 +168,10 @@ class DatasetPipeline:
                     self._reject(asset_id, "download_failed", str(exc))
                     return None
 
-        # 3. Cryptographic Hash
+        # 4. Cryptographic Hash
         sha256 = calculate_sha256(local_path)
 
-        # 4. Quality Audit
+        # 5. Quality Audit
         if media_type == "video":
             video_info = video_processor.process_video(
                 local_path, str(self.staging_dir / asset_id), target_duration=4
@@ -184,7 +200,7 @@ class DatasetPipeline:
             rej_path.write_text(json.dumps({"asset_id": asset_id, "reasons": quality_metrics.failure_reasons}))
             return None
 
-        # 5. Deduplication against processed assets
+        # 6. Deduplication against processed assets
         for existing_meta in self.metadata_dir.glob("*.json"):
             try:
                 data = json.loads(existing_meta.read_text())
@@ -197,11 +213,11 @@ class DatasetPipeline:
             except Exception:
                 continue
 
-        # 6. Automated Captioning
+        # 7. Automated Captioning
         category = cand.get("category", "general")
         caption_meta = auto_captioner.generate_caption(query or category, context={"subject": category})
 
-        # 7. Commit to Processed and write metadata manifest
+        # 8. Commit to Processed and write metadata manifest
         proc_dest = self.processed_dir / f"{asset_id}{Path(local_path).suffix.lower()}"
         if str(proc_dest) != local_path:
             shutil.copy2(local_path, proc_dest)
@@ -257,9 +273,9 @@ class DatasetPipeline:
 
     def generate_manifests(
         self,
-        train_ratio: float = 0.80,
-        val_ratio: float = 0.10,
-        test_ratio: float = 0.10,
+        train_ratio: float = 0.70,
+        val_ratio: float = 0.15,
+        test_ratio: float = 0.15,
     ) -> QualityReport:
         """
         Partitions all processed metadata into train.jsonl, validation.jsonl, and test.jsonl.
@@ -272,17 +288,20 @@ class DatasetPipeline:
             except Exception:
                 continue
 
-        # Shuffle deterministically
-        rng = random.Random(42)
-        rng.shuffle(all_metas)
-
-        n = len(all_metas)
-        n_train = int(n * train_ratio)
-        n_val = int(n * val_ratio)
-
-        train_set = all_metas[:n_train]
-        val_set = all_metas[n_train:n_train + n_val]
-        test_set = all_metas[n_train + n_val:]
+        # Split by source parent, rather than individual clips/assets. This
+        # prevents adjacent clips or re-encodes of a source video leaking into
+        # validation/test. A stable hash makes results reproducible.
+        groups: Dict[str, List[Dict[str, Any]]] = {}
+        for item in all_metas:
+            group_id = str(item.get("source_group_id") or item.get("parent_asset_id") or item.get("asset_id"))
+            groups.setdefault(group_id, []).append(item)
+        ordered_groups = sorted(groups.items(), key=lambda pair: __import__("hashlib").sha256(f"ttv-v001:{pair[0]}".encode()).hexdigest())
+        targets = {"train": len(all_metas) * train_ratio, "validation": len(all_metas) * val_ratio, "test": len(all_metas) * test_ratio}
+        split_map: Dict[str, List[Dict[str, Any]]] = {"train": [], "validation": [], "test": []}
+        for _, group in ordered_groups:
+            bucket = min(split_map, key=lambda name: len(split_map[name]) / max(targets[name], 1))
+            split_map[bucket].extend(group)
+        train_set, val_set, test_set = split_map["train"], split_map["validation"], split_map["test"]
 
         manifest_paths = [
             (self.manifests_dir / "train.jsonl", train_set),

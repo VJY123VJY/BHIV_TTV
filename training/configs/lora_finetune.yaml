@@ -4,8 +4,8 @@ model:
   in_channels: 3
   latent_channels: 64
   num_frames: 8
-  vocab_size: 10000
-  max_prompt_length: 32
+  vocab_size: 30522
+  max_prompt_length: 128
   text_embed_dim: 128
 
 training:

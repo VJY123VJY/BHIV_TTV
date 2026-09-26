@@ -20,13 +20,17 @@ SUPPORTED_STYLES = (
     "anime",
     "fantasy",
     "cyberpunk",
+    "documentary",
+    "custom",
 )
 
 
 class GenerationRequest(BaseModel):
     prompt: str = Field(..., min_length=3, description="Text prompt describing the video to generate")
+    dialogue: Optional[str] = Field(default=None, description="Spoken dialogue text for character narration and lip-sync")
     duration: Optional[int] = Field(default=15, ge=5, le=60, description="Desired video duration in seconds (5-60s)")
     style: Optional[str] = Field(default="cinematic", description="Visual style preset")
+    visual_style: Optional[str] = Field(default=None, description="Visual style preset (alias for style)")
     voice: Optional[bool] = Field(default=True, description="Whether to generate speech narration")
     resolution: Optional[str] = Field(default=None, description="Legacy target resolution (e.g. 1280x720). Prefer aspect_ratio + quality.")
     fps: Optional[int] = Field(default=24, ge=15, le=60, description="Frames per second")
@@ -34,11 +38,12 @@ class GenerationRequest(BaseModel):
     model_mode: Optional[str] = Field(default="base", description="Generation engine mode: base or finetuned")
     aspect_ratio: Optional[str] = Field(default=None, description="Video format: 16:9 or 9:16")
     quality: Optional[str] = Field(default=None, description="Video quality: standard (720p), high (1080p), ultra (4K)")
-    language: Optional[str] = Field(default="en", description="Narration language code (en, hi, mr, gu, fr, es, de)")
+    language: Optional[str] = Field(default="en", description="Narration language code (en, hi, mr, gu, fr, es, de, etc.)")
     voice_id: Optional[str] = Field(default=None, description="Optional TTS voice id compatible with the selected language")
     reference_url: Optional[str] = Field(default=None, description="Public image/video URL used as visual reference")
     reference_type: Optional[str] = Field(default=None, description="Optional hint: image or video")
     reference_id: Optional[str] = Field(default=None, description="ID returned by POST /api/v1/references/upload")
+    reference_file: Optional[str] = Field(default=None, description="Uploaded reference file or reference ID")
     lipsync: Optional[bool] = Field(default=True, description="Apply automatic character lip-sync where a face is visible")
     character_id: Optional[str] = Field(default=None, max_length=80, description="Saved character profile ID or name")
     subtitles: Optional[bool] = Field(default=True, description="Create SRT and WebVTT from the dialogue sent to TTS")
@@ -75,11 +80,11 @@ class GenerationRequest(BaseModel):
         except TTVValidationError as exc:
             raise ValueError(exc.message) from exc
 
-    @field_validator("style")
+    @field_validator("style", "visual_style")
     @classmethod
     def _validate_style(cls, value):
         if value is None:
-            return "cinematic"
+            return None
         key = str(value).strip().lower()
         aliases = {
             "photorealistic": "realistic",
@@ -91,6 +96,8 @@ class GenerationRequest(BaseModel):
             "cinematic / film look": "cinematic",
             "stylized": "3d",
             "3d / stylized": "3d",
+            "documentary": "documentary",
+            "custom": "custom",
         }
         key = aliases.get(key, key)
         if key not in SUPPORTED_STYLES:
@@ -130,10 +137,23 @@ class GenerationRequest(BaseModel):
 
     @model_validator(mode="after")
     def _defaults(self):
-        if not self.language:
-            self.language = "en"
+        # Sync visual_style and style
+        if self.visual_style and (not self.style or self.style == "cinematic"):
+            self.style = self.visual_style
+        elif self.style and not self.visual_style:
+            self.visual_style = self.style
         if not self.style:
             self.style = "cinematic"
+            self.visual_style = "cinematic"
+
+        # Sync reference_file and reference_id
+        if self.reference_file and not self.reference_id:
+            cleaned_ref = str(self.reference_file).strip()
+            if cleaned_ref.startswith("ref_"):
+                self.reference_id = cleaned_ref
+
+        if not self.language:
+            self.language = "en"
         if self.fps is None:
             self.fps = 24
         if self.duration is None:
@@ -158,11 +178,13 @@ class GenerationRequest(BaseModel):
         "protected_namespaces": (),
         "json_schema_extra": {
             "example": {
-                "prompt": "A farmer walking through a green vegetable farm",
+                "prompt": "A young farmer standing in a green field during sunrise",
+                "dialogue": "आज आपण आपल्या शेतातील नवीन पिकाबद्दल माहिती घेणार आहोत.",
                 "duration": 15,
-                "aspect_ratio": "9:16",
+                "aspect_ratio": "16:9",
                 "quality": "high",
-                "style": "realistic",
+                "visual_style": "cinematic",
+                "style": "cinematic",
                 "language": "mr",
                 "voice": True,
                 "reference_url": None,
@@ -173,6 +195,7 @@ class GenerationRequest(BaseModel):
     }
 
 
+<<<<<<< HEAD
 class ReferenceProcessRequest(BaseModel):
     url: str = Field(..., min_length=1, max_length=2048, description="Public reference media URL")
     reference_type: Optional[str] = Field(default=None, description="Optional hint: image or video")
@@ -211,4 +234,12 @@ class TrainingSessionRequest(BaseModel):
     model_config = {
         "protected_namespaces": ()
     }
+=======
+class GenerationDebugRequest(BaseModel):
+    prompt: str = Field(..., min_length=3, description="Text prompt to trace through the pipeline")
+    seed: Optional[int] = Field(default=42, description="Random seed for generation")
+    fps: Optional[int] = Field(default=24, ge=1, le=60, description="Frames per second")
+    num_frames: Optional[int] = Field(default=16, ge=1, le=120, description="Number of frames to generate")
+    resolution: Optional[str] = Field(default="1280x720", description="Resolution string (e.g. 1280x720)")
+>>>>>>> 42b848c (Update TTV training dataset and JSON configuration)
 

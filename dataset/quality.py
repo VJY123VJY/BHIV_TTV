@@ -7,6 +7,7 @@ from typing import Tuple, Optional, List
 import cv2
 import numpy as np
 from PIL import Image
+from dataset.registry import license_is_allowed
 
 from dataset.models import LicenseInfo, QualityMetrics
 
@@ -45,9 +46,9 @@ def verify_license(license_str: Optional[str]) -> LicenseInfo:
         )
 
     norm = license_str.strip().lower()
-    is_eligible = any(perm in norm for perm in PERMISSIVE_LICENSES)
-    if any(non_perm in norm for non_perm in NON_TRAINING_LICENSES):
-        is_eligible = False
+    # The registry is the policy authority.  Keep the local sets for backwards
+    # compatible diagnostics, but never expand the registry allowlist here.
+    is_eligible = license_is_allowed(license_str)
 
     return LicenseInfo(
         license=license_str,
