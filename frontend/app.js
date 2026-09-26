@@ -209,6 +209,29 @@ document.addEventListener("DOMContentLoaded", () => {
     const startTrainingBtn = document.getElementById("start-training-btn");
     const trainingTerminalLog = document.getElementById("training-terminal-log");
     const trainingSessionStatus = document.getElementById("training-session-status");
+    const startTrainingBtnText = document.getElementById("start-training-btn-text");
+    const cliFallbackCard = document.getElementById("cli-fallback-card");
+    const cliFallbackCode = document.getElementById("cli-fallback-code");
+    let selectedManifestFile = null;
+    let trainingPollInterval = null;
+    let activeTrainingJobId = null;
+
+    async function refreshDatasetDashboard() {
+        try {
+            const response = await fetch("/api/v1/dataset/dashboard");
+            if (!response.ok) return;
+            const payload = await response.json();
+            const dataset = payload.dataset || {}, splits = payload.splits || {};
+            const samples = document.getElementById("dataset-samples-count");
+            const resolution = document.getElementById("dataset-resolution");
+            const splitText = document.getElementById("dataset-splits");
+            const licenses = document.getElementById("dataset-license-count");
+            if (samples) samples.textContent = dataset.total_clips ?? "0";
+            if (resolution) resolution.textContent = dataset.average_resolution ? `${Math.round(dataset.average_resolution.width)}×${Math.round(dataset.average_resolution.height)}` : "—";
+            if (splitText) splitText.textContent = `${splits.train || 0} / ${splits.validation || 0} / ${splits.test || 0}`;
+            if (licenses) licenses.textContent = (dataset.licensed_sources || []).length;
+        } catch (_) { /* dashboard is optional; leave unknown values visible */ }
+    }
 
     // RL Feedback View
     const candidateCardA = document.getElementById("candidate-card-a");
@@ -290,6 +313,8 @@ document.addEventListener("DOMContentLoaded", () => {
             renderHistory();
         } else if (targetViewId === "view-settings") {
             fetchSystemHealth();
+        } else if (targetViewId === "view-training") {
+            refreshDatasetDashboard();
         }
     }
 
@@ -1133,21 +1158,183 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    function handleDatasetFile(file) {
+    function setTrainingBadge(status, textOverride = null) {
+        if (!trainingSessionStatus) return;
+        switch (status) {
+            case "queued":
+                trainingSessionStatus.className = "badge badge-queued";
+                trainingSessionStatus.textContent = textOverride || "job queued";
+                break;
+            case "running":
+                trainingSessionStatus.className = "badge badge-running";
+                trainingSessionStatus.textContent = textOverride || "training running";
+                break;
+            case "CUDA_UNAVAILABLE":
+                trainingSessionStatus.className = "badge badge-cuda-unavailable";
+                trainingSessionStatus.textContent = textOverride || "CUDA unavailable";
+                break;
+            case "manual_cli":
+                trainingSessionStatus.className = "badge badge-manual-cli";
+                trainingSessionStatus.textContent = textOverride || "manual CLI required";
+                break;
+            case "completed":
+                trainingSessionStatus.className = "badge badge-success";
+                trainingSessionStatus.textContent = textOverride || "Completed";
+                break;
+            case "failed":
+                trainingSessionStatus.className = "badge badge-danger";
+                trainingSessionStatus.textContent = textOverride || "Failed";
+                break;
+            default:
+                trainingSessionStatus.className = "badge";
+                trainingSessionStatus.textContent = textOverride || "Worker Ready";
+                break;
+        }
+    }
+
+    function appendTerminalLog(text, className = "text-muted") {
+        if (!trainingTerminalLog) return;
+        const line = document.createElement("div");
+        line.className = `log-line ${className}`;
+        line.textContent = text;
+        trainingTerminalLog.appendChild(line);
+        trainingTerminalLog.scrollTop = trainingTerminalLog.scrollHeight;
+    }
+
+    async function handleDatasetFile(file) {
+        selectedManifestFile = file;
         const dropzonePrompt = datasetDropzone.querySelector(".dropzone-prompt");
-        dropzonePrompt.innerHTML = `Loaded manifest: <strong>${file.name}</strong> (${(file.size / 1024).toFixed(1)} KB)`;
-        showToast(`Dataset file ${file.name} loaded successfully!`);
+        if (dropzonePrompt) {
+            dropzonePrompt.innerHTML = `Validating manifest: <strong>${file.name}</strong> (${(file.size / 1024).toFixed(1)} KB)...`;
+        }
+
+        // Validate manifest via backend API without client-side python execution
+        try {
+            const formData = new FormData();
+            formData.append("manifest_file", file);
+
+            const res = await fetch("/api/v1/training/manifest/validate", {
+                method: "POST",
+                body: formData
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                if (dropzonePrompt) {
+                    dropzonePrompt.innerHTML = `Loaded manifest: <strong>${file.name}</strong> (${(file.size / 1024).toFixed(1)} KB) • <strong>${data.total_records}</strong> records`;
+                }
+
+                // Update Dataset Stats Card
+                const samplesEl = document.getElementById("dataset-samples-count");
+                const resolutionEl = document.getElementById("dataset-resolution");
+                const splitTextEl = document.getElementById("dataset-splits");
+                const licenseEl = document.getElementById("dataset-license-count");
+
+                if (samplesEl) samplesEl.textContent = data.valid_records ?? "0";
+                if (resolutionEl) resolutionEl.textContent = "1280×720";
+                if (splitTextEl && data.splits) {
+                    splitTextEl.textContent = `${data.splits.train || 0} / ${data.splits.val || 0} / ${data.splits.test || 0}`;
+                }
+                if (licenseEl && data.categories) {
+                    licenseEl.textContent = `${Object.keys(data.categories).length} categories`;
+                }
+
+                appendTerminalLog(`[Manifest Validated] ${file.name}: ${data.summary}`, "text-success");
+                showToast(`Dataset manifest validated: ${data.total_records} records verified!`, "success");
+            } else {
+                throw new Error("Validation endpoint returned status " + res.status);
+            }
+        } catch (err) {
+            if (dropzonePrompt) {
+                dropzonePrompt.innerHTML = `Loaded file: <strong>${file.name}</strong> (${(file.size / 1024).toFixed(1)} KB)`;
+            }
+            appendTerminalLog(`[Manifest] Loaded ${file.name}. Notice: ${err.message}`, "text-warning");
+            showToast(`Loaded ${file.name}`, "info");
+        }
+    }
+
+    function pollTrainingJob(jobId) {
+        clearInterval(trainingPollInterval);
+
+        let lastLogIndex = 0;
+        trainingPollInterval = setInterval(async () => {
+            try {
+                // Poll Status
+                const statusRes = await fetch(`/api/v1/training/jobs/${jobId}`);
+                if (!statusRes.ok) return;
+                const job = await statusRes.json();
+
+                // Poll Logs
+                const logsRes = await fetch(`/api/v1/training/jobs/${jobId}/logs?offset=${lastLogIndex}`);
+                if (logsRes.ok) {
+                    const logsData = await logsRes.json();
+                    if (Array.isArray(logsData.logs) && logsData.logs.length > 0) {
+                        logsData.logs.forEach(lineText => {
+                            let cls = "text-muted";
+                            if (lineText.includes("[CUDA Check] FAILED") || lineText.includes("CUDA_UNAVAILABLE")) cls = "text-warning";
+                            else if (lineText.includes("FAILED") || lineText.includes("Error") || lineText.includes("Exception")) cls = "text-danger";
+                            else if (lineText.includes("SUCCESS") || lineText.includes("completed")) cls = "text-success";
+                            else if (lineText.includes("[Worker]") || lineText.includes("[Config]")) cls = "text-accent";
+                            appendTerminalLog(lineText, cls);
+                        });
+                        lastLogIndex += logsData.logs.length;
+                    }
+                }
+
+                // Update UI based on distinct statuses
+                if (job.status === "queued") {
+                    setTrainingBadge("queued", "job queued");
+                } else if (job.status === "running") {
+                    setTrainingBadge("running", `training running (${job.progress || 0}%)`);
+                } else if (job.status === "CUDA_UNAVAILABLE") {
+                    clearInterval(trainingPollInterval);
+                    setTrainingBadge("CUDA_UNAVAILABLE", "CUDA unavailable");
+                    if (job.cli_fallback_command) {
+                        if (cliFallbackCode) cliFallbackCode.textContent = job.cli_fallback_command;
+                        if (cliFallbackCard) cliFallbackCard.classList.remove("hidden");
+                    }
+                    if (startTrainingBtn) startTrainingBtn.disabled = false;
+                    if (startTrainingBtnText) startTrainingBtnText.textContent = "Launch Training";
+                    showToast("CUDA unavailable on this system. Manual CLI fallback required in a CUDA environment.", "warning", 6000);
+                } else if (job.status === "completed") {
+                    clearInterval(trainingPollInterval);
+                    setTrainingBadge("completed", "Training Completed");
+                    if (startTrainingBtn) startTrainingBtn.disabled = false;
+                    if (startTrainingBtnText) startTrainingBtnText.textContent = "Launch Training";
+                    showToast("Model fine-tuning completed successfully!", "success");
+                } else if (job.status === "failed") {
+                    clearInterval(trainingPollInterval);
+                    setTrainingBadge("failed", "Training Failed");
+                    if (job.cli_fallback_command) {
+                        if (cliFallbackCode) cliFallbackCode.textContent = job.cli_fallback_command;
+                        if (cliFallbackCard) cliFallbackCard.classList.remove("hidden");
+                    }
+                    if (startTrainingBtn) startTrainingBtn.disabled = false;
+                    if (startTrainingBtnText) startTrainingBtnText.textContent = "Launch Training";
+                    showToast(`Training failed: ${job.error || "Subprocess exited with failure"}`, "error");
+                }
+            } catch (err) {
+                // Ignore transient polling glitches
+            }
+        }, 1200);
     }
 
     if (startTrainingBtn) {
         startTrainingBtn.addEventListener("click", async () => {
+<<<<<<< HEAD
             const epochs = parseInt(document.getElementById("train-epochs")?.value || "10", 10);
             const lr = document.getElementById("train-lr")?.value || "0.0001";
             const batchSize = parseInt(document.getElementById("train-batch-size")?.value || "2", 10);
+=======
+            const epochs = document.getElementById("train-epochs")?.value || "10";
+            const lr = document.getElementById("train-lr")?.value || "0.0001";
+            const batchSize = document.getElementById("train-batch-size")?.value || "2";
+>>>>>>> 42b848c (Update TTV training dataset and JSON configuration)
             const method = document.getElementById("train-method")?.value || "lora";
             const baseModel = document.getElementById("train-base-model")?.value || "SpatialTemporalTTVModel";
 
             startTrainingBtn.disabled = true;
+<<<<<<< HEAD
             trainingSessionStatus.textContent = "Session Active";
             trainingSessionStatus.className = "badge badge-success";
 
@@ -1230,6 +1417,78 @@ document.addEventListener("DOMContentLoaded", () => {
                 trainingSessionStatus.className = "badge badge-danger";
                 startTrainingBtn.disabled = false;
                 showToast(err.message, "error", 5000);
+=======
+            if (startTrainingBtnText) startTrainingBtnText.textContent = "Submitting Job...";
+
+            setTrainingBadge("queued", "job queued");
+
+            trainingTerminalLog.innerHTML = "";
+            appendTerminalLog(`[Launch] Preparing Fine-Tuning Job (Base: ${baseModel}, Method: ${method}, Epochs: ${epochs}, LR: ${lr}, Batch: ${batchSize})...`, "text-accent");
+
+            try {
+                const formData = new FormData();
+                formData.append("base_model", baseModel);
+                formData.append("method", method);
+                formData.append("epochs", epochs);
+                formData.append("learning_rate", lr);
+                formData.append("batch_size", batchSize);
+
+                if (selectedManifestFile) {
+                    formData.append("manifest_file", selectedManifestFile);
+                } else {
+                    formData.append("manifest_path", "data/manifests/ttv_training_manifest_120.jsonl");
+                }
+
+                const response = await fetch("/api/v1/training/jobs", {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.detail || errData.message || "Failed to create training job");
+                }
+
+                const data = await response.json();
+                activeTrainingJobId = data.job_id;
+
+                if (data.cli_fallback_command) {
+                    if (cliFallbackCode) cliFallbackCode.textContent = data.cli_fallback_command;
+                    if (cliFallbackCard) cliFallbackCard.classList.remove("hidden");
+                }
+
+                // If backend determined CUDA is unavailable:
+                if (data.status === "CUDA_UNAVAILABLE") {
+                    setTrainingBadge("CUDA_UNAVAILABLE", "CUDA unavailable");
+                    appendTerminalLog(`[System] Job ID registered: ${data.job_id}`, "text-info");
+                    appendTerminalLog(`[Manifest] Records evaluated: ${data.manifest_stats?.total_records || 120} (${data.manifest_stats?.summary || "Valid"})`, "text-muted");
+                    appendTerminalLog("[CUDA Check] FAILED: NVIDIA CUDA acceleration is not available in this environment.", "text-warning");
+                    appendTerminalLog("[Status] CUDA_UNAVAILABLE: Browser and local CPU environment cannot train CUDA models.", "text-warning");
+                    appendTerminalLog("[Manual CLI Required] Run the reviewed CLI command in a CUDA training environment:", "text-accent");
+                    appendTerminalLog(`  ${data.cli_fallback_command}`, "text-accent");
+
+                    showToast("CUDA unavailable on this system. Run the reviewed CLI command in a CUDA environment.", "warning", 6000);
+                    startTrainingBtn.disabled = false;
+                    if (startTrainingBtnText) startTrainingBtnText.textContent = "Launch Training";
+                    return;
+                }
+
+                // If CUDA is available: job is queued or running
+                if (data.status === "queued" || data.status === "running") {
+                    setTrainingBadge(data.status, data.status === "queued" ? "job queued" : "training running");
+                    appendTerminalLog(`[Job Started] Unique Job ID: ${data.job_id}`, "text-info");
+                    appendTerminalLog("[Worker] Worker subprocess launched. Polling execution logs...", "text-muted");
+                    showToast("Training job launched! Polling execution worker...", "success");
+                    pollTrainingJob(data.job_id);
+                }
+
+            } catch (err) {
+                setTrainingBadge("failed", "Launch Failed");
+                appendTerminalLog(`[Error] Failed to submit training job: ${err.message}`, "text-danger");
+                showToast(`Launch failed: ${err.message}`, "error");
+                startTrainingBtn.disabled = false;
+                if (startTrainingBtnText) startTrainingBtnText.textContent = "Launch Training";
+>>>>>>> 42b848c (Update TTV training dataset and JSON configuration)
             }
         });
     }

@@ -611,7 +611,7 @@
                         <div class="studio-card model-card">
                             <div class="model-badge badge-accent">LoRA Adapter</div>
                             <h3 class="model-name">TTV LoRA v001 (Cinematic)</h3>
-                            <p class="model-desc">Low-Rank Adaptation trained on cinematic dataset pairs. Enhances photographic texture, depth, and smooth camera pan motion.</p>
+                            <p class="model-desc">Legacy research LoRA checkpoint. It is not evidence of production Wan improvement; validate it with the fixed benchmark before use.</p>
                             <div class="model-specs">
                                 <div class="spec-item"><span class="spec-key">LoRA Rank (r):</span> <span class="spec-val">8</span></div>
                                 <div class="spec-item"><span class="spec-key">LoRA Alpha:</span> <span class="spec-val">16</span></div>
@@ -675,26 +675,26 @@
                                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="M12 12v9"></path><path d="m16 16-4-4-4 4"></path></svg>
                                     <p class="dropzone-prompt"><strong>Click to select</strong> or drag and drop dataset manifest</p>
                                     <span class="dropzone-hint">Supports JSON manifest, CSV, or video directory archive</span>
-                                    <input type="file" id="dataset-file-input" class="hidden" accept=".json,.csv,.zip">
+                                    <input type="file" id="dataset-file-input" class="hidden" accept=".json,.jsonl,.csv,.zip">
                                 </div>
 
                                 <!-- Real Dataset Statistics -->
                                 <div class="dataset-stats-grid">
                                     <div class="stat-pill">
-                                        <span class="stat-num" id="dataset-samples-count">45</span>
+                                        <span class="stat-num" id="dataset-samples-count">—</span>
                                         <span class="stat-lbl">Video Samples</span>
                                     </div>
                                     <div class="stat-pill">
-                                        <span class="stat-num">1280x720</span>
+                                        <span class="stat-num" id="dataset-resolution">—</span>
                                         <span class="stat-lbl">Resolution</span>
                                     </div>
                                     <div class="stat-pill">
-                                        <span class="stat-num">80% / 20%</span>
-                                        <span class="stat-lbl">Train / Val Split</span>
+                                        <span class="stat-num" id="dataset-splits">—</span>
+                                        <span class="stat-lbl">Train / Val / Test</span>
                                     </div>
                                     <div class="stat-pill">
-                                        <span class="stat-num">manifest.json</span>
-                                        <span class="stat-lbl">Format</span>
+                                        <span class="stat-num" id="dataset-license-count">—</span>
+                                        <span class="stat-lbl">Licensed Sources</span>
                                     </div>
                                 </div>
                             </div>
@@ -788,7 +788,7 @@
                                 <div class="training-btn-row">
                                     <button type="button" id="start-training-btn" class="primary-generate-btn">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                                        <span>Start Training Session</span>
+                                        <span id="start-training-btn-text">Launch Training</span>
                                     </button>
                                 </div>
                             </div>
@@ -808,9 +808,18 @@
 
                                 <div class="terminal-log-window" id="training-terminal-log">
                                     <div class="log-line text-muted">[System] Training environment initialized with PyTorch.</div>
-                                    <div class="log-line text-muted">[Dataset] Found 45 video deliverables in generated/videos.</div>
-                                    <div class="log-line text-muted">[Model] SpatialTemporalTTVModel loaded. LoRA rank=8 configured.</div>
-                                    <div class="log-line text-accent">[CLI] Execute: python training/run_training.py --config training/configs/smoke_test.yaml</div>
+                                    <div class="log-line text-muted">[Dataset] Ready for dataset manifest upload.</div>
+                                    <div class="log-line text-muted">[Model] SpatialTemporalTTVModel selected.</div>
+                                    <div class="log-line text-accent">[CLI Fallback] python training/run_training.py --config training/configs/smoke_test.yaml</div>
+                                </div>
+
+                                <!-- Manual CLI Fallback Container -->
+                                <div id="cli-fallback-card" class="cli-fallback-box hidden">
+                                    <div class="cli-fallback-title">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                                        <span>Manual CLI Required (CUDA Environment)</span>
+                                    </div>
+                                    <code class="cli-fallback-code" id="cli-fallback-code">python training/run_training.py --config training/configs/smoke_test.yaml</code>
                                 </div>
                             </div>
 
@@ -823,24 +832,14 @@
 
                                 <div class="benchmarks-table">
                                     <div class="benchmark-row">
-                                        <span class="bm-metric">Training Loss (MSE)</span>
-                                        <span class="bm-val highlight-green">0.038</span>
-                                        <span class="bm-target">Target: &lt; 0.050</span>
+                                        <span class="bm-metric">Base vs. fine-tuned benchmark</span>
+                                        <span class="bm-val">Not run</span>
+                                        <span class="bm-target">Use ttv_fixed_v001</span>
                                     </div>
                                     <div class="benchmark-row">
-                                        <span class="bm-metric">Validation Loss</span>
-                                        <span class="bm-val">0.044</span>
-                                        <span class="bm-target">Target: &lt; 0.060</span>
-                                    </div>
-                                    <div class="benchmark-row">
-                                        <span class="bm-metric">Fréchet Video Distance (FVD)</span>
-                                        <span class="bm-val highlight-green">142.6</span>
-                                        <span class="bm-target">Lower is better</span>
-                                    </div>
-                                    <div class="benchmark-row">
-                                        <span class="bm-metric">Temporal Consistency (SSIM)</span>
-                                        <span class="bm-val highlight-green">0.892</span>
-                                        <span class="bm-target">Target: &gt; 0.850</span>
+                                        <span class="bm-metric">Prompt/motion/temporal rubric</span>
+                                        <span class="bm-val">Pending</span>
+                                        <span class="bm-target">Shared 1–5 review</span>
                                     </div>
                                 </div>
                             </div>

@@ -4,6 +4,7 @@ Wikimedia Commons public-domain & Creative Commons dataset source adapter.
 from typing import List, Dict, Any, Optional
 import httpx
 from dataset.quality import verify_license
+from dataset.registry import license_is_allowed
 
 
 class WikimediaSource:
@@ -47,7 +48,12 @@ class WikimediaSource:
                     license_info = verify_license(license_name)
 
                     # Only retain assets permitted for model training
-                    if not license_info.training_eligible:
+                    # Require the explicit registry allowlist *and* sufficient
+                    # attribution metadata; neither Commons hosting nor a
+                    # generic free-license label is enough by itself.
+                    creator = ext_meta.get("Artist", {}).get("value", "").strip()
+                    license_url = ext_meta.get("LicenseUrl", {}).get("value", "").strip()
+                    if not license_info.training_eligible or not license_is_allowed(license_name) or not creator or not license_url:
                         continue
 
                     results.append({
@@ -57,8 +63,8 @@ class WikimediaSource:
                         "source_url": info.get("url"),
                         "download_url": info.get("url"),
                         "license": license_info.license,
-                        "license_url": ext_meta.get("LicenseUrl", {}).get("value"),
-                        "creator": ext_meta.get("Artist", {}).get("value"),
+                        "license_url": license_url,
+                        "creator": creator,
                         "width": info.get("width"),
                         "height": info.get("height"),
                         "allowed_for_training": license_info.training_eligible,

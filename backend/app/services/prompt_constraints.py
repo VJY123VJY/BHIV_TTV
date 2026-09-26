@@ -7,10 +7,48 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from app.models.scene import Scene
 
-_COLORS = ("red", "blue", "green", "yellow", "black", "white", "silver", "orange", "purple", "brown")
-_WEATHER = ("heavy rain", "rain", "snow", "fog", "storm", "sunny", "overcast")
-_ENVIRONMENTS = ("highway", "city street", "city", "farm", "vegetable field", "field", "classroom", "kitchen", "park", "forest", "beach", "road")
-_ACTIONS = ("driving", "running", "walking", "speaking", "talking", "cooking", "riding", "working", "teaching")
+_COLORS = ("red", "blue", "green", "yellow", "black", "white", "silver", "orange", "purple", "brown", "golden")
+_WEATHER = ("heavy rain", "rain", "snow", "fog", "storm", "sunny", "overcast", "gentle wind", "wind")
+_ENVIRONMENTS = (
+    "lush green agricultural field",
+    "agricultural field",
+    "vegetable field",
+    "snowy forest",
+    "highway",
+    "city street",
+    "city",
+    "farm",
+    "field",
+    "classroom",
+    "kitchen",
+    "park",
+    "forest",
+    "beach",
+    "road",
+    "savanna",
+    "sky",
+    "clouds",
+    "ocean",
+    "waterfall",
+    "mountain",
+)
+_ACTIONS = (
+    "driving",
+    "running",
+    "walking slowly",
+    "walking",
+    "flying",
+    "speaking",
+    "talking",
+    "cooking",
+    "riding",
+    "working",
+    "teaching",
+    "grazing",
+    "flowing",
+    "rolling",
+    "moving",
+)
 
 
 def _first_present(text: str, values: Iterable[str]) -> Optional[str]:
@@ -65,7 +103,7 @@ class PromptConstraintService:
         if not camera:
             camera = "smooth tracking shot" if action in {"driving", "running", "riding"} else "cinematic medium shot"
         subject_match = re.search(
-            r"\b((?:(?:red|blue|green|yellow|black|white|silver|orange)\s+)?(?:(?:sports|race|delivery)\s+)?(?:sedan|suv|truck|car|motorcycle|bike|farmer|chef|student|woman|man|person|animal|dog|cat))\b",
+            r"\b((?:(?:red|blue|green|yellow|black|white|silver|orange|golden)\s+)?(?:(?:sports|race|delivery|indian)\s+)?(?:sedan|suv|truck|car|motorcycle|bike|farmer|chef|student|woman|man|person|animal|dog|cat|retriever|airplane|plane|jet|elephant|waterfall|ball|astronaut|robot|bird))\b",
             text,
         )
         subject = subject_match.group(1) if subject_match else str(analysis.get("subject") or "subject")

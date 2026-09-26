@@ -1,5 +1,7 @@
 # Unified Text-to-Video (TTV) AI Studio
 
+For the provenance-first dataset workflow, Wan/LoRA compatibility, benchmark protocol, current hardware audit, and exact commands, see [TTV_IMPROVEMENT_PIPELINE.md](TTV_IMPROVEMENT_PIPELINE.md).
+
 A consolidated, production-ready, enterprise-grade Text-to-Video system intelligently engineered by auditing and merging 19 individual repositories into a single coherent architecture.
 
 ---

@@ -49,8 +49,12 @@ generated/images/*
 generated/scenes/*
 generated/audio/*
 generated/videos/*
+<<<<<<< HEAD
 generated/references/*
 generated/temp/*
+=======
+generated/training_jobs/*
+>>>>>>> 42b848c (Update TTV training dataset and JSON configuration)
 !generated/**/.gitkeep
 
 # IDE

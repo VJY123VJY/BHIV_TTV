@@ -27,7 +27,9 @@ class Settings(BaseSettings):
     TTS_PROVIDER: str = "local"
     VISION_PROVIDER: str = "standard"
 
-    # Model Mode (base | finetuned)
+    # Model Mode (base | wan_lora | finetuned).  ``finetuned`` is retained for
+    # the small legacy SpatialTemporal research model; production Wan adapters
+    # must use ``wan_lora`` so incompatible checkpoints are never loaded.
     MODEL_MODE: str = "base"
     FINE_TUNED_CHECKPOINT_PATH: Optional[str] = None
 
@@ -40,6 +42,8 @@ class Settings(BaseSettings):
     WAN_NUM_FRAMES: int = 81
     WAN_INFERENCE_STEPS: int = 30
     WAN_GUIDANCE_SCALE: float = 5.0
+    WAN_LORA_PATH: Optional[str] = None
+    WAN_LORA_SCALE: float = 1.0
     # Optional HuggingFace token for gated/private model access
     HF_TOKEN: Optional[str] = None
 

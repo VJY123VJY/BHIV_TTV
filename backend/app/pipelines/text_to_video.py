@@ -1,10 +1,12 @@
 import time
+import json
 from typing import Dict, Any, List, Optional, Callable
 from app.models.scene import Scene
 from app.core.config import settings
 from app.core.logging import telemetry
 from app.core.security import governance_guard
 from app.core.exceptions import VisualGenerationError
+from app.core.queue import job_manager
 from app.services.prompt_service import prompt_service
 from app.services.story_service import story_service
 from app.services.scene_service import scene_service
@@ -176,6 +178,7 @@ class TextToVideoPipeline:
     async def execute(
         self,
         prompt: str,
+        dialogue: Optional[str] = None,
         duration: int = 15,
         style: str = "cinematic",
         voice: bool = True,
@@ -217,6 +220,8 @@ class TextToVideoPipeline:
         gen_params = {
             "duration": duration,
             "style": style_key,
+            "visual_style": style_key,
+            "dialogue": dialogue,
             "voice": voice,
             "fps": fps_value,
             "resolution": video_cfg["resolution"],
@@ -231,6 +236,7 @@ class TextToVideoPipeline:
         }
         telemetry.emit("pipeline_execution_started", execution_id, {
             "received_prompt": prompt,
+            "dialogue": dialogue,
             "generation_request_id": execution_id,
             "models_used": models_used,
             "generation_parameters": gen_params
@@ -246,10 +252,10 @@ class TextToVideoPipeline:
         try:
             self.governance.verify_execution(token=token, execution_id=execution_id)
 
-            await _report("validating_settings", 4)
+            await _report("prompt_processed", 4)
             clean_prompt = self.validate_prompt(prompt, execution_id)
 
-            await _report("processing_reference", 8)
+            await _report("reference_processed", 8)
             reference = await reference_service.resolve(reference_url, reference_id, reference_type)
 
             # This is inference-time context only. It never changes a training
@@ -272,7 +278,8 @@ class TextToVideoPipeline:
 
             await _report("generating_scenes", 35)
             scenes = await self.generate_scenes(script, duration, style_key, execution_id)
-            scenes = localization_service.apply(scenes, language_code, analysis)
+            # Apply language and user-supplied spoken dialogue
+            scenes = localization_service.apply(scenes, language_code, analysis, dialogue=dialogue)
             scenes = character_service.apply_character_consistency(scenes, character_id, language_code)
 
             profile = character_service.get_profile(character_id)
@@ -287,14 +294,24 @@ class TextToVideoPipeline:
             await _report("generating_keyframes", 55)
             scenes = await self.generate_visual_assets(scenes, execution_id, width, height, reference)
 
-            await _report("rendering_scene_videos", 68)
+            await _report("rendering_video", 68)
+            await job_manager.update_stage_status(execution_id, video_status="processing")
             scenes = await self.generate_scene_videos(scenes, execution_id, fps=fps_value, width=width, height=height)
+            await job_manager.update_stage_status(execution_id, video_status="completed")
 
-            await _report("synthesizing_voice", 76)
+            await _report("voice_generated", 76)
+            if voice:
+                await job_manager.update_stage_status(execution_id, tts_status="processing")
             scenes = await self.generate_voice(scenes, voice, execution_id, language=language_code, voice=voice_id)
+            if voice:
+                await job_manager.update_stage_status(execution_id, tts_status="completed")
 
-            await _report("applying_lipsync", 82)
+            await _report("lip_synchronization", 82)
+            if lipsync and voice:
+                await job_manager.update_stage_status(execution_id, lip_sync_status="processing")
             scenes = await lipsync_service.apply_to_scenes(scenes, execution_id, enabled=bool(lipsync and voice))
+            if lipsync and voice:
+                await job_manager.update_stage_status(execution_id, lip_sync_status="completed")
 
             await _report("mixing_audio", 86)
             original_music_setting = settings.BACKGROUND_MUSIC_ENABLED
@@ -304,7 +321,7 @@ class TextToVideoPipeline:
             finally:
                 settings.BACKGROUND_MUSIC_ENABLED = original_music_setting
 
-            await _report("assembling_final_video", 92)
+            await _report("finalizing_video", 92)
             final_raw_video = self.assemble_video(
                 scenes, master_audio, execution_id, width=width, height=height, fps=fps_value
             )
@@ -331,6 +348,8 @@ class TextToVideoPipeline:
                     "aspect_ratio": video_cfg["aspect_ratio"],
                     "quality": video_cfg["quality"],
                     "language": language_code,
+                    "dialogue": dialogue,
+                    "visual_style": style_key,
                     "lipsync": bool(lipsync and voice),
                     "voice_enabled": voice,
                     "character_id": character_id,
@@ -349,7 +368,6 @@ class TextToVideoPipeline:
                 }
                 # Persist the newly-added subtitle URLs in the existing sidecar.
                 sidecar = settings.get_absolute_path(settings.OUTPUT_DIR) / f"{execution_id}_metadata.json"
-                import json
                 sidecar.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
             metadata["processing_time_s"] = round(time.time() - start_time, 2)
             metadata["validation"] = validation_info

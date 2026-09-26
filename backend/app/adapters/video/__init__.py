@@ -6,7 +6,11 @@ from app.adapters.video.external_video_adapter import ExternalVideoAdapter
 from app.core.config import settings
 
 def get_video_adapter(provider: str = "opencv"):
-    if getattr(settings, "MODEL_MODE", "base").lower() == "finetuned":
+    mode = getattr(settings, "MODEL_MODE", "base").lower()
+    if mode == "wan_lora":
+        from app.adapters.video.wan_video_adapter import WanVideoAdapter
+        return WanVideoAdapter(require_lora=True)
+    if mode == "finetuned":
         from app.adapters.video.neural_video_adapter import NeuralVideoAdapter
         return NeuralVideoAdapter()
     p = (provider or "opencv").lower()

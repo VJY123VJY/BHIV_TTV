@@ -49,8 +49,8 @@ class TextToVideoDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Dict[str, Any]:
         sample = self.samples[idx]
-        video_path = sample["video_path"]
-        prompt = sample.get("prompt", "")
+        video_path = sample.get("video_path") or sample.get("video_url") or sample.get("source_url") or ""
+        prompt = sample.get("prompt") or sample.get("caption") or ""
 
         # 1. Process video frames -> Tensor shape: (T, C, H, W) normalized to [-1, 1]
         frames_tensor = self.video_preprocessor.process_video(video_path)

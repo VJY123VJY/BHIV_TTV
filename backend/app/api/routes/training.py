@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """Training and Fine-Tuning API routes with full Reference workflow support."""
 from __future__ import annotations
 
@@ -225,3 +226,181 @@ async def get_training_status(job_id: str):
         config=session.get("config"),
         logs=session.get("logs", [])
     )
+=======
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Optional, List, Dict, Any
+
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request, Query
+from fastapi.responses import JSONResponse
+
+from app.core.config import settings
+from app.schemas.training import (
+    TrainingJobConfig,
+    TrainingJobResponse,
+    TrainingLogsResponse,
+    ManifestValidationResponse,
+)
+from app.services.training_service import (
+    training_job_manager,
+    parse_manifest_records,
+    validate_manifest_records,
+)
+
+router = APIRouter()
+
+
+@router.post("/jobs", response_model=TrainingJobResponse)
+async def launch_or_queue_training_job(
+    request: Request,
+    manifest_file: Optional[UploadFile] = File(None),
+    manifest_path: Optional[str] = Form(None),
+    manifest_content: Optional[str] = Form(None),
+    base_model: str = Form("SpatialTemporalTTVModel"),
+    method: str = Form("lora"),
+    epochs: int = Form(10),
+    learning_rate: float = Form(0.0001),
+    batch_size: int = Form(2),
+    version_name: Optional[str] = Form(None),
+):
+    """
+    Submits a training/fine-tuning job request.
+    - Validates uploaded JSON/JSONL manifest without modifying dataset files.
+    - If CUDA is unavailable, returns a clear CUDA_UNAVAILABLE status with reviewed CLI command.
+    - If CUDA is available, queues job and launches background worker subprocess.
+    - Supports both multipart/form-data and application/json.
+    """
+    content_type = request.headers.get("content-type", "")
+    manifest_filename = None
+
+    # Handle application/json request
+    if "application/json" in content_type:
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+        cfg = {
+            "base_model": body.get("base_model", "SpatialTemporalTTVModel"),
+            "method": body.get("method", "lora"),
+            "epochs": int(body.get("epochs", 10)),
+            "learning_rate": float(body.get("learning_rate", 0.0001)),
+            "batch_size": int(body.get("batch_size", 2)),
+            "version_name": body.get("version_name"),
+        }
+        manifest_raw = body.get("manifest") or body.get("manifest_content") or body.get("manifest_path")
+        if not manifest_raw:
+            manifest_raw = "data/manifests/ttv_training_manifest_120.jsonl"
+            if not settings.get_absolute_path(manifest_raw).exists():
+                manifest_raw = "training/datasets/dataset.jsonl"
+        manifest_filename = body.get("manifest_filename")
+
+    # Handle multipart/form-data
+    else:
+        cfg = {
+            "base_model": base_model,
+            "method": method,
+            "epochs": epochs,
+            "learning_rate": learning_rate,
+            "batch_size": batch_size,
+            "version_name": version_name,
+        }
+        if manifest_file and manifest_file.filename:
+            manifest_raw = await manifest_file.read()
+            manifest_filename = manifest_file.filename
+        elif manifest_content:
+            manifest_raw = manifest_content
+            manifest_filename = "manifest_inline.json"
+        elif manifest_path:
+            manifest_raw = manifest_path
+            manifest_filename = Path(manifest_path).name
+        else:
+            # Default to bundled 120-record manifest or local dataset
+            default_p = settings.get_absolute_path("data/manifests/ttv_training_manifest_120.jsonl")
+            if default_p.exists():
+                manifest_raw = str(default_p)
+                manifest_filename = "ttv_training_manifest_120.jsonl"
+            else:
+                manifest_raw = "training/datasets/dataset.jsonl"
+                manifest_filename = "dataset.jsonl"
+
+    try:
+        job = await training_job_manager.create_job(
+            manifest_data=manifest_raw,
+            config=cfg,
+            manifest_filename=manifest_filename
+        )
+        return TrainingJobResponse(**job)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create training job: {str(e)}")
+
+
+@router.get("/jobs/{job_id}", response_model=TrainingJobResponse)
+async def get_training_job_status(job_id: str):
+    """Retrieves current execution status, progress, checkpoints, and hardware diagnostics for a training job."""
+    job = training_job_manager.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Training job '{job_id}' not found.")
+    return TrainingJobResponse(**job)
+
+
+@router.get("/jobs/{job_id}/logs", response_model=TrainingLogsResponse)
+async def get_training_job_logs(
+    job_id: str,
+    offset: int = Query(default=0, ge=0),
+    limit: Optional[int] = Query(default=None, ge=1)
+):
+    """Streams execution terminal stdout/stderr logs for a given training job."""
+    logs_data = training_job_manager.get_job_logs(job_id, offset=offset, limit=limit)
+    if not logs_data:
+        raise HTTPException(status_code=404, detail=f"Training job '{job_id}' not found.")
+    return TrainingLogsResponse(**logs_data)
+
+
+@router.get("/jobs", response_model=List[TrainingJobResponse])
+async def list_training_jobs(limit: int = Query(default=20, ge=1, le=100)):
+    """Lists recent training and fine-tuning jobs."""
+    jobs = training_job_manager.list_jobs(limit=limit)
+    return [TrainingJobResponse(**j) for j in jobs]
+
+
+@router.post("/manifest/validate", response_model=ManifestValidationResponse)
+async def validate_manifest_endpoint(
+    request: Request,
+    manifest_file: Optional[UploadFile] = File(None),
+    manifest_path: Optional[str] = Form(None),
+    manifest_content: Optional[str] = Form(None)
+):
+    """
+    Validates a training manifest (JSON or JSONL) before submitting training.
+    Reports record counts, split partitions, category statistics, and any format issues.
+    """
+    content_type = request.headers.get("content-type", "")
+    manifest_filename = None
+
+    if "application/json" in content_type:
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid JSON body")
+        raw = body.get("manifest") or body.get("manifest_content") or body.get("manifest_path")
+        manifest_filename = body.get("manifest_filename")
+    else:
+        if manifest_file and manifest_file.filename:
+            raw = await manifest_file.read()
+            manifest_filename = manifest_file.filename
+        elif manifest_content:
+            raw = manifest_content
+        elif manifest_path:
+            raw = manifest_path
+        else:
+            default_p = settings.get_absolute_path("data/manifests/ttv_training_manifest_120.jsonl")
+            raw = str(default_p) if default_p.exists() else "training/datasets/dataset.jsonl"
+
+    records, resolved_path = parse_manifest_records(raw)
+    result = validate_manifest_records(records)
+    result["manifest_path"] = resolved_path or manifest_filename
+    return ManifestValidationResponse(**result)
+>>>>>>> 42b848c (Update TTV training dataset and JSON configuration)

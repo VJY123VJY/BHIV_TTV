@@ -13,13 +13,13 @@ QUALITIES = ("standard", "high", "ultra")
 
 VIDEO_SETTINGS: Dict[str, Dict[str, Any]] = {
     "16:9": {
-        "label": "Landscape / YouTube",
+        "label": "Landscape – YouTube",
         "standard": (1280, 720),
         "high": (1920, 1080),
         "ultra": (3840, 2160),
     },
     "9:16": {
-        "label": "Vertical / Reels / Shorts",
+        "label": "Vertical – Reels / Shorts",
         "standard": (720, 1280),
         "high": (1080, 1920),
         "ultra": (2160, 3840),
@@ -53,12 +53,18 @@ def normalize_aspect_ratio(value: Optional[str]) -> Optional[str]:
         "landscape": "16:9",
         "youtube": "16:9",
         "widescreen": "16:9",
+        "landscape/youtube": "16:9",
+        "landscape–youtube": "16:9",
+        "landscape-youtube": "16:9",
         "9:16": "9:16",
         "9x16": "9:16",
         "portrait": "9:16",
         "vertical": "9:16",
         "reels": "9:16",
         "shorts": "9:16",
+        "vertical/reels/shorts": "9:16",
+        "vertical–reels/shorts": "9:16",
+        "vertical-reels/shorts": "9:16",
     }
     return aliases.get(cleaned, str(value).strip())
 

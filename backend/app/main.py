@@ -8,7 +8,11 @@ from fastapi.responses import JSONResponse, FileResponse
 from app.core.config import settings
 from app.core.logging import logger, telemetry
 from app.core.exceptions import TTVException, ValidationError, GovernanceViolationError
+<<<<<<< HEAD
 from app.api.routes import generate, jobs, videos, health, training
+=======
+from app.api.routes import generate, jobs, videos, health, dataset, training
+>>>>>>> 42b848c (Update TTV training dataset and JSON configuration)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -65,6 +69,8 @@ app.include_router(jobs.router, prefix="/api/v1", tags=["Jobs"])
 app.include_router(videos.router, prefix="/api/v1", tags=["Videos"])
 app.include_router(training.router, prefix="/api/v1/training", tags=["Training"])
 app.include_router(health.router, tags=["Health"])
+app.include_router(dataset.router, tags=["Dataset"])
+app.include_router(training.router, prefix="/api/v1/training", tags=["Training"])
 
 
 # Mount Generated Media Directory for Direct Streaming

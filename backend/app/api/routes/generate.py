@@ -2,6 +2,7 @@ import asyncio
 from fastapi import APIRouter, UploadFile, File, Form
 from typing import Optional
 
+<<<<<<< HEAD
 from app.schemas.request import GenerationRequest, ReferenceProcessRequest, SUPPORTED_STYLES
 from app.schemas.response import (
     GenerationResponse,
@@ -9,9 +10,14 @@ from app.schemas.response import (
     ReferenceUploadResponse,
     ReferenceDetailResponse,
 )
+=======
+from app.schemas.request import GenerationRequest, GenerationDebugRequest, SUPPORTED_STYLES
+from app.schemas.response import GenerationResponse, GenerationSettings, ReferenceUploadResponse
+>>>>>>> 42b848c (Update TTV training dataset and JSON configuration)
 from app.core.queue import job_manager
 from app.pipelines.text_to_video import pipeline
 from app.utils.hashing import generate_execution_id
+from app.services.pipeline_diagnostic import diagnose_pipeline_execution
 from app.core.config import settings
 from app.core.logging import telemetry
 from app.utils.video_settings import resolve_video_settings, catalog as video_catalog
@@ -23,12 +29,15 @@ router = APIRouter()
 
 def _resolved_settings(request: GenerationRequest) -> GenerationSettings:
     video_cfg = resolve_video_settings(request.aspect_ratio, request.quality, request.resolution)
+    effective_style = request.visual_style or request.style or "cinematic"
     return GenerationSettings(
         aspect_ratio=video_cfg["aspect_ratio"],
         quality=video_cfg["quality"],
         resolution=video_cfg["resolution"],
-        style=request.style or "cinematic",
+        style=effective_style,
+        visual_style=effective_style,
         language=request.language or "en",
+        dialogue=request.dialogue,
         fps=request.fps or 24,
         lipsync=True if request.lipsync is None else request.lipsync,
         character_id=request.character_id,
@@ -45,8 +54,9 @@ async def _run_generation_task(job_id: str, request: GenerationRequest):
 
         result = await pipeline.execute(
             prompt=request.prompt,
+            dialogue=request.dialogue,
             duration=request.duration or 15,
-            style=request.style or "cinematic",
+            style=request.visual_style or request.style or "cinematic",
             voice=request.voice if request.voice is not None else True,
             token=request.token,
             job_id=job_id,
@@ -59,7 +69,7 @@ async def _run_generation_task(job_id: str, request: GenerationRequest):
             voice_id=request.voice_id,
             reference_url=request.reference_url,
             reference_type=request.reference_type,
-            reference_id=request.reference_id,
+            reference_id=request.reference_id or request.reference_file,
             lipsync=True if request.lipsync is None else request.lipsync,
             model_mode=request.model_mode,
             character_id=request.character_id,
@@ -165,6 +175,7 @@ async def generate_video(request: GenerationRequest):
     resolved = _resolved_settings(request)
     telemetry.emit("request_received", job_id, {
         "received_prompt": request.prompt,
+        "dialogue": request.dialogue,
         "generation_request_id": job_id,
         "models_used": {
             "llm": settings.LLM_PROVIDER,
@@ -184,3 +195,20 @@ async def generate_video(request: GenerationRequest):
         message="Video generation job queued successfully",
         settings=resolved,
     )
+
+
+@router.post("/generate/debug")
+async def generate_debug(request: GenerationDebugRequest):
+    """
+    Diagnostic endpoint that traces prompt tokenization, text embeddings,
+    model architecture, checkpoint metadata, device, latent shapes,
+    and runs a lightweight pipeline trace.
+    """
+    return diagnose_pipeline_execution(
+        prompt=request.prompt,
+        seed=request.seed or 42,
+        fps=request.fps or 24,
+        num_frames=request.num_frames or 16,
+        resolution=request.resolution or "1280x720",
+    )
+

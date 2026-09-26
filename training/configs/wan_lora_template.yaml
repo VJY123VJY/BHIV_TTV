@@ -1,0 +1,43 @@
+# Template only: do not launch until the hardware check and legal review pass.
+# This config is deliberately not wired to the legacy SpatialTemporal smoke
+# trainer. Wan LoRA needs a Wan-compatible trainer (for example a maintained
+# Diffusers training recipe) and an NVIDIA CUDA environment.
+model:
+  name: Wan-AI/Wan2.2-TI2V-5B-Diffusers
+  architecture: diffusion-transformer-image-to-video
+  base_model_dir: models/base/Wan-AI-Wan2.2-TI2V-5B-Diffusers
+  adapter_format: diffusers_lora
+
+dataset:
+  version: dataset_v001
+  path: data
+  train_manifest: data/train/metadata.jsonl
+  validation_manifest: data/validation/metadata.jsonl
+  test_manifest: data/test/metadata.jsonl
+  train_split: 0.70
+  validation_split: 0.15
+  test_split: 0.15
+  require_caption_review: true
+  require_license_review: true
+
+preprocessing:
+  target_fps: 24
+  clip_seconds: 4
+  resolutions:
+    landscape: [1280, 720]
+    portrait: [720, 1280]
+  resize_policy: contain_with_padding
+
+training:
+  method: lora
+  lora_rank: 16
+  lora_alpha: 16
+  learning_rate: 0.0001
+  epochs: 5
+  batch_size: auto
+  gradient_accumulation: auto
+  mixed_precision: auto
+  checkpoint_interval: 500
+  output_dir: models/experiments/ttv_wan_lora_v001
+  # The launcher refuses CPU-only systems and does not fabricate a successful run.
+  minimum_vram_gb: 24

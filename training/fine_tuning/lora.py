@@ -50,6 +50,47 @@ class LoRALinear(nn.Module):
         return base_out
 
 
+class LoRAConv1d(nn.Module):
+    """
+    Parameter-Efficient Fine-Tuning LoRA layer for 1D temporal convolutions.
+    Uses 1x1 low-rank temporal convolutions.
+    """
+    def __init__(
+        self,
+        base_layer: nn.Conv1d,
+        rank: int = 4,
+        alpha: float = 8.0,
+        dropout: float = 0.0
+    ):
+        super().__init__()
+        self.base_layer = base_layer
+        self.rank = rank
+        self.alpha = alpha
+        self.scaling = alpha / rank if rank > 0 else 1.0
+
+        # Freeze base layer
+        self.base_layer.weight.requires_grad = False
+        if self.base_layer.bias is not None:
+            self.base_layer.bias.requires_grad = False
+
+        if rank > 0:
+            self.lora_A = nn.Conv1d(base_layer.in_channels, rank, kernel_size=1, bias=False)
+            self.lora_B = nn.Conv1d(rank, base_layer.out_channels, kernel_size=1, bias=False)
+            nn.init.kaiming_uniform_(self.lora_A.weight, a=math.sqrt(5))
+            nn.init.zeros_(self.lora_B.weight)
+            self.dropout = nn.Dropout(p=dropout) if dropout > 0.0 else nn.Identity()
+        else:
+            self.lora_A = None
+            self.lora_B = None
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        base_out = self.base_layer(x)
+        if self.rank > 0:
+            lora_out = self.lora_B(self.lora_A(self.dropout(x)))
+            return base_out + self.scaling * lora_out
+        return base_out
+
+
 class LoRAConv2d(nn.Module):
     """
     Parameter-Efficient Fine-Tuning LoRA layer for 2D convolutions.
@@ -109,10 +150,12 @@ def apply_lora_to_model(
         param.requires_grad = False
 
     # Substitute target layers
-    for name, module in model.named_children():
+    for name, module in list(model.named_children()):
         if any(t in name for t in target_names):
             if isinstance(module, nn.Linear):
                 setattr(model, name, LoRALinear(module, rank=rank, alpha=alpha))
+            elif isinstance(module, nn.Conv1d):
+                setattr(model, name, LoRAConv1d(module, rank=rank, alpha=alpha))
             elif isinstance(module, nn.Conv2d):
                 setattr(model, name, LoRAConv2d(module, rank=rank, alpha=alpha))
         else:
@@ -133,9 +176,4 @@ def get_lora_state_dict(model: nn.Module) -> Dict[str, torch.Tensor]:
 
 def load_lora_state_dict(model: nn.Module, lora_dict: Dict[str, torch.Tensor]) -> None:
     """Loads LoRA parameters into the model."""
-    model_state = model.state_dict()
-    for name, param in lora_dict.items():
-        if name in model_state:
-            model_state[name].copy_(param)
-        else:
-            print(f"Warning: LoRA key {name} not found in model state.")
+    model.load_state_dict(lora_dict, strict=False)

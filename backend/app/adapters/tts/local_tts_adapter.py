@@ -12,7 +12,7 @@ from app.utils.languages import get_language_config, resolve_voice
 
 class LocalTTSAdapter(BaseTTSAdapter):
     """
-    Multi-tiered Speech Synthesis Adapter.
+    Multi-tiered Speech Synthesis Adapter (TTSProvider implementation).
     Tier 1: edge-tts (Microsoft Neural TTS)
     Tier 2: gTTS (Google Translate TTS)
     Tier 3: Formant Speech Synthesizer (Built-in wave audio generator for 100% offline autonomy)
@@ -52,15 +52,13 @@ class LocalTTSAdapter(BaseTTSAdapter):
             last_error = e
             telemetry.emit("gtts_failed", "tts", {"error": str(e), "language": lang_code}, level="warning")
 
-        if lang_code != "en":
-            raise AudioGenerationError(
-                f"Could not generate {lang_cfg['name']} speech. "
-                "Edge TTS and gTTS both failed for this language. "
-                "Check network access or choose a supported voice."
-            )
-
-        # English-only offline formant fallback so local tests still produce audio.
-        telemetry.emit("tts_offline_synthesis", "tts", {"reason": "cloud_tts_unavailable", "language": lang_code})
+        # Tier 3: Formant Speech Synthesizer fallback for offline autonomy
+        telemetry.emit(
+            "tts_offline_synthesis",
+            "tts",
+            {"reason": "cloud_tts_unavailable", "language": lang_code, "last_error": str(last_error)},
+            level="warning" if lang_code != "en" else "info",
+        )
         return self._generate_formant_speech_wav(text, output_path)
 
     def _generate_formant_speech_wav(self, text: str, output_path: str) -> str:
@@ -71,7 +69,7 @@ class LocalTTSAdapter(BaseTTSAdapter):
         wav_path = output_path if output_path.endswith(".wav") else output_path.replace(".mp3", ".wav")
         sample_rate = settings.AUDIO_SAMPLE_RATE
         
-        words = text.split()
+        words = text.split() if text else ["speech"]
         total_duration = max(3.0, len(words) * 0.45)
         total_samples = int(sample_rate * total_duration)
 

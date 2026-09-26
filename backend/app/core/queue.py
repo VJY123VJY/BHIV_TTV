@@ -16,6 +16,21 @@ class JobManager:
         settings: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         async with self._lock:
+            resolved_settings = settings or {}
+            aspect_ratio = resolved_settings.get("aspect_ratio") or request_data.get("aspect_ratio") or "16:9"
+            visual_style = (
+                resolved_settings.get("visual_style")
+                or resolved_settings.get("style")
+                or request_data.get("visual_style")
+                or request_data.get("style")
+                or "cinematic"
+            )
+            language = resolved_settings.get("language") or request_data.get("language") or "en"
+            reference_type = request_data.get("reference_type")
+            reference_url = request_data.get("reference_url")
+            voice_enabled = request_data.get("voice", True)
+            lipsync_enabled = request_data.get("lipsync", True)
+
             job = {
                 "job_id": job_id,
                 "status": "queued",
@@ -23,6 +38,14 @@ class JobManager:
                 "stage": "queued",
                 "request": request_data,
                 "settings": settings,
+                "aspect_ratio": aspect_ratio,
+                "visual_style": visual_style,
+                "language": language,
+                "reference_type": reference_type,
+                "reference_url": reference_url,
+                "tts_status": "pending" if voice_enabled else "skipped",
+                "video_status": "pending",
+                "lip_sync_status": "pending" if (lipsync_enabled and voice_enabled) else "skipped",
                 "created_at": datetime.utcnow().isoformat() + "Z",
                 "updated_at": datetime.utcnow().isoformat() + "Z",
                 "result": None,
@@ -39,6 +62,23 @@ class JobManager:
                 self._jobs[job_id]["progress"] = progress
                 self._jobs[job_id]["updated_at"] = datetime.utcnow().isoformat() + "Z"
 
+    async def update_stage_status(
+        self,
+        job_id: str,
+        tts_status: Optional[str] = None,
+        video_status: Optional[str] = None,
+        lip_sync_status: Optional[str] = None,
+    ):
+        async with self._lock:
+            if job_id in self._jobs:
+                if tts_status is not None:
+                    self._jobs[job_id]["tts_status"] = tts_status
+                if video_status is not None:
+                    self._jobs[job_id]["video_status"] = video_status
+                if lip_sync_status is not None:
+                    self._jobs[job_id]["lip_sync_status"] = lip_sync_status
+                self._jobs[job_id]["updated_at"] = datetime.utcnow().isoformat() + "Z"
+
     async def complete_job(self, job_id: str, result_data: Dict[str, Any]):
         async with self._lock:
             if job_id in self._jobs:
@@ -46,6 +86,11 @@ class JobManager:
                 self._jobs[job_id]["stage"] = "completed"
                 self._jobs[job_id]["progress"] = 100
                 self._jobs[job_id]["result"] = result_data
+                if self._jobs[job_id]["tts_status"] != "skipped":
+                    self._jobs[job_id]["tts_status"] = "completed"
+                self._jobs[job_id]["video_status"] = "completed"
+                if self._jobs[job_id]["lip_sync_status"] != "skipped":
+                    self._jobs[job_id]["lip_sync_status"] = "completed"
                 self._jobs[job_id]["updated_at"] = datetime.utcnow().isoformat() + "Z"
 
     async def fail_job(self, job_id: str, error_message: str):
@@ -54,6 +99,12 @@ class JobManager:
                 self._jobs[job_id]["status"] = "failed"
                 self._jobs[job_id]["stage"] = "failed"
                 self._jobs[job_id]["error"] = error_message
+                if self._jobs[job_id]["tts_status"] == "processing":
+                    self._jobs[job_id]["tts_status"] = "failed"
+                if self._jobs[job_id]["video_status"] == "processing":
+                    self._jobs[job_id]["video_status"] = "failed"
+                if self._jobs[job_id]["lip_sync_status"] == "processing":
+                    self._jobs[job_id]["lip_sync_status"] = "failed"
                 self._jobs[job_id]["updated_at"] = datetime.utcnow().isoformat() + "Z"
 
     def get_job(self, job_id: str) -> Dict[str, Any]:

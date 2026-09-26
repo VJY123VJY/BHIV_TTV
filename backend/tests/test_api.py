@@ -18,7 +18,8 @@ def test_generate_validation_fail():
 def test_generate_queued_success():
     payload = {
         "prompt": "A small rover roaming the dunes of Mars.",
-        "duration": 10,
+        "duration": 5,
+        "fps": 15,
         "style": "cinematic",
         "voice": True
     }
@@ -55,7 +56,7 @@ def test_generate_validation_errors(field, value):
 def test_complete_generation_request_is_accepted():
     payload = {
         "prompt": "A farmer walking through a green vegetable farm",
-        "duration": 15,
+        "duration": 5,
         "aspect_ratio": "9:16",
         "quality": "high",
         "style": "realistic",
@@ -63,7 +64,7 @@ def test_complete_generation_request_is_accepted():
         "voice": True,
         "reference_url": None,
         "reference_type": None,
-        "fps": 24
+        "fps": 15
     }
     response = client.post("/api/v1/generate", json=payload)
     assert response.status_code == 200

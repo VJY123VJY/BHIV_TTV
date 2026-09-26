@@ -20,6 +20,14 @@ async def get_job_status(job_id: str):
             result=job.get("result"),
             error=job.get("error"),
             settings=job.get("settings"),
+            aspect_ratio=job.get("aspect_ratio"),
+            visual_style=job.get("visual_style"),
+            language=job.get("language"),
+            reference_type=job.get("reference_type"),
+            reference_url=job.get("reference_url"),
+            tts_status=job.get("tts_status"),
+            video_status=job.get("video_status"),
+            lip_sync_status=job.get("lip_sync_status"),
         )
     except JobNotFoundError:
         raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")

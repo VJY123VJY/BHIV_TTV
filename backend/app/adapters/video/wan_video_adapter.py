@@ -215,7 +215,7 @@ class WanVideoAdapter(BaseVideoAdapter):
     * Output is an MP4 file at the path expected by video_service.py.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, require_lora: bool = False) -> None:
         self._pipeline = None  # Loaded lazily
         self._model_id: str = settings.WAN_MODEL_ID
         self._device: str = settings.WAN_DEVICE
@@ -223,6 +223,9 @@ class WanVideoAdapter(BaseVideoAdapter):
         self._num_frames: int = settings.WAN_NUM_FRAMES
         self._inference_steps: int = settings.WAN_INFERENCE_STEPS
         self._guidance_scale: float = settings.WAN_GUIDANCE_SCALE
+        self._require_lora = require_lora
+        self._lora_path: Optional[str] = settings.WAN_LORA_PATH
+        self._lora_scale: float = settings.WAN_LORA_SCALE
         logger.info(
             f"[WanVideoAdapter] Initialised (model={self._model_id}, "
             f"device={self._device}, dtype={self._dtype_str}). "
@@ -272,6 +275,23 @@ class WanVideoAdapter(BaseVideoAdapter):
                 torch_dtype=torch_dtype,
                 token=hf_token,
             )
+            if self._require_lora:
+                if not self._lora_path:
+                    raise VisualGenerationError(
+                        "MODEL_MODE=wan_lora requires WAN_LORA_PATH. "
+                        "Use an adapter trained against this exact Wan base model."
+                    )
+                lora_path = os.path.abspath(self._lora_path)
+                if not os.path.exists(lora_path):
+                    raise VisualGenerationError(f"Wan LoRA adapter does not exist: {lora_path}")
+                if not hasattr(self._pipeline, "load_lora_weights"):
+                    raise VisualGenerationError(
+                        "The installed diffusers Wan pipeline does not expose LoRA loading. "
+                        "Upgrade to a Wan-compatible diffusers release before enabling wan_lora."
+                    )
+                self._pipeline.load_lora_weights(lora_path)
+                if hasattr(self._pipeline, "fuse_lora"):
+                    self._pipeline.fuse_lora(lora_scale=self._lora_scale)
             self._pipeline.to(self._device)
             logger.info("[WanVideoAdapter] Pipeline loaded and moved to device successfully.")
         except Exception as exc:
@@ -376,6 +396,7 @@ class WanVideoAdapter(BaseVideoAdapter):
                 "device": self._device,
                 "dtype": self._dtype_str,
                 "num_frames": self._num_frames,
+                "lora_enabled": self._require_lora,
                 "resolution": f"{width}x{height}",
             },
         )
